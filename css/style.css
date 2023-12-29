@@ -20,27 +20,35 @@ h2 {
     font-size: 35px;
     text-align: center;
     vertical-align: middle;
-    width: 100%;
+    margin: auto;
 }
 
 article {
-    color: blueviolet;
-    background-color: white;
+    color: white;
+    background-color: blueviolet;
     font-size: 30px;
     text-align: center;
-    vertical-align: middle;
     width: 100%;
-    padding: 10px;
+    margin: auto;
+    padding: 30px;
+    border: 10px solid black;
 }
 
+.about-section {
+    color: white;
+    background-color: blueviolet;
+    font-size: 30px;
+    text-align: center;
+    width: 100%;
+    margin: auto;
+    padding: 10px;
+    border: 10px solid black;
+}
 h3 {
     color: white;
     background-color: blueviolet;
     font-size: 30px;
     text-align: center;
-    vertical-align: middle;
-    width: 100%;
-    padding: 10px;
 }
 
 a {
@@ -54,4 +62,5 @@ img {
     font-size: 25px;
     text-align: center;
     vertical-align: middle;
+    border: 10px solid white;
 }
