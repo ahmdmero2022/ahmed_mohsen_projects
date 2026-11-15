@@ -392,8 +392,10 @@ CREATE OR REPLACE PACKAGE BODY lms_feedback_pkg AS
   -- ------------------------------------------------------------------- reminders (JOB) -----
   FUNCTION send_reminders RETURN NUMBER IS
     l_after  NUMBER := lms_util_pkg.get_number('FEEDBACK_REMINDER_DAYS', 3);
+    l_nudge  NUMBER := lms_util_pkg.get_number('FEEDBACK_NUDGE2_DAYS', 7);
     l_window NUMBER := lms_util_pkg.get_number('FEEDBACK_REMINDER_WINDOW_DAYS', 30);
     l_sent   NUMBER := 0;
+    -- first reminder
     CURSOR c IS
       SELECT e.enrollment_id, e.user_id, co.title_en
         FROM lms_enrollments e
@@ -406,13 +408,34 @@ CREATE OR REPLACE PACKAGE BODY lms_feedback_pkg AS
               OR (SELECT COUNT(*) FROM lms_feedback_responses fr WHERE fr.enrollment_id = e.enrollment_id)
                  < (SELECT COUNT(*) FROM lms_feedback_questions q WHERE q.form_id = co.feedback_form_id))
          FOR UPDATE OF e.feedback_reminded_at SKIP LOCKED;
+    -- final nudge: only after a first reminder, only while feedback is still missing, never twice
+    CURSOR c2 IS
+      SELECT e.enrollment_id, e.user_id, co.title_en
+        FROM lms_enrollments e
+        JOIN lms_courses co ON co.course_id = e.course_id
+        JOIN lms_users u ON u.user_id = e.user_id AND u.status = 'ACTIVE'
+       WHERE e.status = 'COMPLETED' AND e.feedback_reminded_at IS NOT NULL AND e.feedback_reminded2_at IS NULL
+         AND e.feedback_reminded_at <= SYSTIMESTAMP - NUMTODSINTERVAL(l_nudge, 'DAY')
+         AND e.completed_at >= SYSTIMESTAMP - NUMTODSINTERVAL(l_window, 'DAY')
+         AND (NOT EXISTS (SELECT 1 FROM lms_course_reviews r WHERE r.enrollment_id = e.enrollment_id)
+              OR (SELECT COUNT(*) FROM lms_feedback_responses fr WHERE fr.enrollment_id = e.enrollment_id)
+                 < (SELECT COUNT(*) FROM lms_feedback_questions q WHERE q.form_id = co.feedback_form_id))
+         FOR UPDATE OF e.feedback_reminded2_at SKIP LOCKED;
   BEGIN
-    IF l_after <= 0 THEN RETURN 0; END IF;                       -- disabled by policy
-    FOR r IN c LOOP
-      lms_notification_pkg.enqueue(r.user_id, 'FEEDBACK_REMINDER', lms_util_pkg.js('course', r.title_en));
-      UPDATE lms_enrollments SET feedback_reminded_at = SYSTIMESTAMP WHERE CURRENT OF c;   -- never reminded twice
-      l_sent := l_sent + 1;
-    END LOOP;
+    IF l_after > 0 THEN
+      FOR r IN c LOOP
+        lms_notification_pkg.enqueue(r.user_id, 'FEEDBACK_REMINDER', lms_util_pkg.js('course', r.title_en));
+        UPDATE lms_enrollments SET feedback_reminded_at = SYSTIMESTAMP WHERE CURRENT OF c;   -- never reminded twice
+        l_sent := l_sent + 1;
+      END LOOP;
+    END IF;
+    IF l_nudge > 0 THEN
+      FOR r IN c2 LOOP
+        lms_notification_pkg.enqueue(r.user_id, 'FEEDBACK_NUDGE', lms_util_pkg.js('course', r.title_en));
+        UPDATE lms_enrollments SET feedback_reminded2_at = SYSTIMESTAMP WHERE CURRENT OF c2;
+        l_sent := l_sent + 1;
+      END LOOP;
+    END IF;
     IF l_sent > 0 THEN
       lms_audit_pkg.log_event('FEEDBACK_REMINDERS', 'ENROLLMENT', NULL, 'SUCCESS', lms_util_pkg.js('queued', l_sent));
     END IF;
@@ -677,4 +700,141 @@ CREATE OR REPLACE PACKAGE BODY lms_reporting_pkg AS
     RETURN l_c;
   END org_kpis;
 END lms_reporting_pkg;
+/
+
+-- ------------------------------------------------------------------ CALENDAR -------
+CREATE OR REPLACE PACKAGE BODY lms_calendar_pkg AS
+  c_crlf CONSTANT VARCHAR2(2) := CHR(13) || CHR(10);
+
+  -- RFC 5545 TEXT escaping
+  FUNCTION esc(p IN VARCHAR2) RETURN VARCHAR2 IS
+  BEGIN
+    RETURN REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(p, '\', '\\'), ';', '\;'), ',', '\,'), CHR(13), ''), CHR(10), '\n');
+  END esc;
+
+  -- RFC 5545 line folding: at most 75 octets per line, never inside a multi-byte character (database character set AL32UTF8).
+  FUNCTION fold(p_line IN VARCHAR2) RETURN VARCHAR2 IS
+    l_out VARCHAR2(32767); l_bytes PLS_INTEGER := 0; l_ch VARCHAR2(4); l_b PLS_INTEGER;
+  BEGIN
+    FOR i IN 1 .. LENGTH(p_line) LOOP
+      l_ch := SUBSTR(p_line, i, 1);
+      l_b := LENGTHB(l_ch);
+      IF l_bytes + l_b > 75 THEN
+        l_out := l_out || c_crlf || ' ';
+        l_bytes := 1;
+      END IF;
+      l_out := l_out || l_ch;
+      l_bytes := l_bytes + l_b;
+    END LOOP;
+    RETURN l_out;
+  END fold;
+
+  FUNCTION utc(p_ts IN TIMESTAMP WITH TIME ZONE) RETURN VARCHAR2 IS
+  BEGIN
+    RETURN TO_CHAR(SYS_EXTRACT_UTC(p_ts), 'YYYYMMDD"T"HH24MISS"Z"');
+  END utc;
+
+  FUNCTION build_ics(p_session_id IN NUMBER, p_user_id IN NUMBER, p_method IN VARCHAR2) RETURN CLOB IS
+    l_s      lms_training_sessions%ROWTYPE;
+    l_u      lms_users%ROWTYPE;
+    l_c      lms_courses%ROWTYPE;
+    l_v      lms_venues%ROWTYPE;
+    l_method VARCHAR2(8) := p_method;
+    l_ics    CLOB;
+    l_ar     BOOLEAN;
+    l_title  VARCHAR2(500); l_where VARCHAR2(1000); l_desc VARCHAR2(2000); l_name VARCHAR2(300);
+    l_domain VARCHAR2(200) := NVL(lms_util_pkg.get_setting('ICS_UID_DOMAIN'), 'lms.example.invalid');
+    l_from   VARCHAR2(254) := NVL(lms_util_pkg.get_setting('MAIL_FROM'), 'noreply@' || l_domain);
+    l_alarm  NUMBER := lms_util_pkg.get_number('ICS_ALARM_MINUTES', 60);
+    PROCEDURE line(p IN VARCHAR2) IS BEGIN l_ics := l_ics || fold(p) || c_crlf; END line;
+  BEGIN
+    IF p_method NOT IN ('REQUEST','CANCEL') THEN RAISE_APPLICATION_ERROR(-20400, 'Invalid calendar method'); END IF;
+    BEGIN SELECT * INTO l_s FROM lms_training_sessions WHERE session_id = p_session_id;
+    EXCEPTION WHEN NO_DATA_FOUND THEN RAISE_APPLICATION_ERROR(-20404, 'Session not found'); END;
+    SELECT * INTO l_u FROM lms_users WHERE user_id = p_user_id;
+    SELECT * INTO l_c FROM lms_courses WHERE course_id = l_s.course_id;
+    IF l_s.venue_id IS NOT NULL THEN SELECT * INTO l_v FROM lms_venues WHERE venue_id = l_s.venue_id; END IF;
+    IF l_s.status = 'CANCELLED' THEN l_method := 'CANCEL'; END IF;           -- a cancelled session can only be withdrawn
+    l_ar := (l_u.preferred_lang = 'ar');
+
+    l_title := CASE WHEN l_ar AND l_c.title_ar IS NOT NULL THEN l_c.title_ar ELSE l_c.title_en END;
+    l_where := CASE WHEN l_s.venue_id IS NOT NULL
+                    THEN CASE WHEN l_ar AND l_v.name_ar IS NOT NULL THEN l_v.name_ar ELSE l_v.name_en END
+                         || CASE WHEN l_v.address IS NOT NULL THEN ', ' || l_v.address END
+                    ELSE 'Online' END;
+    l_desc  := CASE WHEN l_method = 'CANCEL' THEN 'This session was cancelled.'
+                    ELSE l_title || CASE WHEN l_s.meeting_url IS NOT NULL THEN CHR(10) || l_s.meeting_url END END;
+    l_name  := REPLACE(REPLACE(CASE WHEN l_ar AND l_u.full_name_ar IS NOT NULL THEN l_u.full_name_ar ELSE l_u.full_name_en END, '"', ''), ':', ' ');
+
+    DBMS_LOB.createtemporary(l_ics, TRUE);
+    line('BEGIN:VCALENDAR');
+    line('VERSION:2.0');
+    line('PRODID:-//LMS//Training sessions//EN');
+    line('CALSCALE:GREGORIAN');
+    line('METHOD:' || l_method);
+    line('BEGIN:VEVENT');
+    line('UID:session-' || l_s.session_id || '@' || l_domain);      -- stable: updates and cancellations replace the same entry
+    line('DTSTAMP:' || utc(SYSTIMESTAMP));
+    line('DTSTART:' || utc(l_s.start_ts));
+    line('DTEND:' || utc(l_s.end_ts));
+    line('SEQUENCE:' || l_s.ics_sequence);
+    line('STATUS:' || CASE WHEN l_method = 'CANCEL' THEN 'CANCELLED' ELSE 'CONFIRMED' END);
+    line('SUMMARY:' || esc(l_title));
+    line('DESCRIPTION:' || esc(l_desc));
+    line('LOCATION:' || esc(l_where));
+    IF l_method = 'REQUEST' AND l_s.meeting_url IS NOT NULL THEN line('URL:' || l_s.meeting_url); END IF;
+    line('ORGANIZER;CN="LMS":mailto:' || l_from);
+    line('ATTENDEE;CN="' || l_name || '";ROLE=REQ-PARTICIPANT;PARTSTAT=NEEDS-ACTION;RSVP=FALSE:mailto:' || l_u.email);
+    line('TRANSP:OPAQUE');
+    IF l_method = 'REQUEST' AND l_alarm > 0 THEN
+      line('BEGIN:VALARM');
+      line('ACTION:DISPLAY');
+      line('DESCRIPTION:' || esc(l_title));
+      line('TRIGGER:-PT' || TRUNC(l_alarm) || 'M');
+      line('END:VALARM');
+    END IF;
+    line('END:VEVENT');
+    line('END:VCALENDAR');
+    RETURN l_ics;
+  END build_ics;
+
+  FUNCTION my_session_ics(p_session_id IN NUMBER) RETURN CLOB IS
+    l_user NUMBER := lms_security_pkg.current_user_id;
+    l_s lms_training_sessions%ROWTYPE; l_reg VARCHAR2(12); l_method VARCHAR2(8);
+  BEGIN
+    BEGIN SELECT * INTO l_s FROM lms_training_sessions WHERE session_id = p_session_id;
+    EXCEPTION WHEN NO_DATA_FOUND THEN RAISE_APPLICATION_ERROR(-20404, 'Session not found'); END;
+    lms_rate_limit_pkg.enforce_limit('FILE_DOWNLOAD', l_user);
+    BEGIN SELECT status INTO l_reg FROM lms_session_enrollments WHERE session_id = p_session_id AND user_id = l_user;
+    EXCEPTION WHEN NO_DATA_FOUND THEN l_reg := NULL; END;
+    IF l_reg IS NULL THEN
+      IF l_s.instructor_id = l_user THEN l_reg := 'TRAINER';
+      ELSE
+        lms_audit_pkg.log_event('ACCESS_DENIED', 'SESSION', p_session_id, 'DENIED');
+        RAISE_APPLICATION_ERROR(-20403, 'Not authorized');
+      END IF;
+    END IF;
+    IF l_reg = 'WAITLISTED' THEN RAISE_APPLICATION_ERROR(-20409, 'You are on the waiting list for this session'); END IF;
+    l_method := CASE WHEN l_s.status = 'CANCELLED' OR l_reg = 'CANCELLED' THEN 'CANCEL' ELSE 'REQUEST' END;
+    lms_audit_pkg.log_event('ICS_DOWNLOAD', 'SESSION', p_session_id);
+    RETURN build_ics(p_session_id, l_user, l_method);
+  END my_session_ics;
+
+  PROCEDURE stream_my_ics(p_session_id IN NUMBER) IS
+    l_ics CLOB := my_session_ics(p_session_id);
+    l_pos PLS_INTEGER := 1;
+    l_len PLS_INTEGER := DBMS_LOB.getlength(l_ics);
+  BEGIN
+    sys.htp.init;
+    sys.owa_util.mime_header('text/calendar; charset=UTF-8', FALSE);
+    sys.htp.p('Content-Disposition: attachment; filename="session-' || p_session_id || '.ics"');
+    sys.htp.p('Cache-Control: private, no-store');
+    sys.owa_util.http_header_close;
+    WHILE l_pos <= l_len LOOP
+      sys.htp.prn(DBMS_LOB.substr(l_ics, 8000, l_pos));
+      l_pos := l_pos + 8000;
+    END LOOP;
+    apex_application.stop_apex_engine;
+  END stream_my_ics;
+END lms_calendar_pkg;
 /

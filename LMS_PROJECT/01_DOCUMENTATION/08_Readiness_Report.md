@@ -6,7 +6,7 @@
 |---|---|---|
 | Documents 01–07 | Written | Files in this repo |
 | Mermaid diagrams | **Unverified** | Not rendered; syntax reviewed by eye only |
-| `02_DATABASE/*.sql` (16 scripts, 56 tables, 92 views, 22 packages, 165 public members) | **Unverified on Oracle** | Not run or compiled. Static checks run: SQL parser on all DDL/views, name uniqueness, FK order, package call/spec/body consistency, validation list = DDL (see `02_DATABASE/README.md`) |
+| `02_DATABASE/*.sql` (16 scripts, 56 tables, 92 views, 23 packages, 168 public members) | **Unverified on Oracle** | Not run or compiled. Static checks run: SQL parser on all DDL/views, name uniqueness, FK order, package call/spec/body consistency, validation list = DDL (see `02_DATABASE/README.md`) |
 | `05_INTEGRATIONS/` ORDS modules, OpenAPI, smoke test | **Unverified** | ORDS API calls not executed; YAML parses; `bash -n` passes on the test script |
 | `03_APEX/` page specifications, shared components, static files | **Specification** | No APEX export; `player.js`/`assessment.js` pass `node --check` but were not run in a browser; CSS not rendered |
 | APEX export | **Not produced** | Page specs only |
@@ -44,7 +44,8 @@ Open items:
 9. **Certificate PDF** layout (APEX report/`APEX_PRINT`) is not built; `V_LMS_CERTIFICATE_PRINT` and `AUTHORIZE_DOWNLOAD` are the data and authorisation hooks.
 10. **File type checks use magic bytes only**; there is no malware scan and no content-disarm for Office files (macros are not executed by the viewer, but the files are downloadable).
 11. **Signed content URLs** need `LMS_SECRET_PKG` to be replaced per environment; the shipped stub fails closed (`ORA-20500`).
-12. **`LMS_APEX_PKG.POST_AUTH`** relies on `APEX_UTIL.SET_SESSION_LANG`, `APEX_APPLICATION.STOP_APEX_ENGINE` and a redirect from a post-authentication procedure; confirm on 24.1.
+12. **Calendar attachments are untested end to end**: `APEX_MAIL.SEND` returning a mail id and `ADD_ATTACHMENT` from a scheduler job, the `text/calendar; method=…` MIME header, and how Outlook, Google and Apple calendars treat an attachment from a non-organiser mailbox (some show it as an attachment only, not as an invitation) all need a real mail test. `ORGANIZER` is the `MAIL_FROM` address, which is not a mailbox that can receive replies.
+13. **`LMS_APEX_PKG.POST_AUTH`** relies on `APEX_UTIL.SET_SESSION_LANG`, `APEX_APPLICATION.STOP_APEX_ENGINE` and a redirect from a post-authentication procedure; confirm on 24.1.
 13. **ERDs in doc 03** were not re-reconciled line by line after the DDL changes (section 5 of doc 03 lists the differences).
 
 ## 4. Outstanding work
@@ -56,7 +57,7 @@ Open items:
 | 3 | Run the ORDS scripts, confirm API behaviour (`:status_code`, `Retry-After` header parameter, OAuth client creation/rotation), run `ords_smoke_test.sh`; configure the WAF for the chosen product | §15 |
 | 4 | Content platform integration: pre-signed upload, signing-key provisioning (`LMS_SECRET_PKG` body per environment), virus scan hook | §5 M4, §14 |
 | 5 | ~~Skills administration~~ — **done** (`save_skill`, `remove_skill`, `set_position_skill`, `set_course_skill`, `copy_position_skills`); remaining: bulk import of skill requirements from the HR system, competency *framework* grouping beyond the `skill_group` text | §5 M11 |
-| 6 | ~~Feedback questionnaire authoring~~ — **done** (forms, questions, assignment, clone, review editing policy, anonymity threshold); venue maintenance and the daily feedback reminder are now done; remaining: a second feedback nudge, reminder e-mails carrying a calendar invite (ICS), and per-user reminder preferences | §5 M9, M12, M13 |
+| 6 | ~~Feedback questionnaire authoring~~ — **done** (forms, questions, assignment, clone, review editing policy, anonymity threshold); venue maintenance and the daily feedback reminder are now done; remaining: per-user reminder preferences, reminder e-mails with a calendar entry for the learner's own time zone label, an in-app calendar subscription feed, and ICS handling of multi-day sessions as one entry per day | §5 M9, M12, M13 |
 | 7 | Skills history table if a skills *trend* is required (dashboard currently shows current gap index only) | §12.14 |
 | 8 | JMeter/k6 scripts and data generators for 5k courses / 100k enrolments / 1M activity rows | §19 |
 | 9 | Arabic UI/notification text review by a native speaker; XLIFF translation of page text | §2 |
@@ -64,7 +65,7 @@ Open items:
 | 11 | Per-release reverse-migration scripts (the supplied rollback is a full drop) | §22 |
 | 12 | Business decisions: OQ-10 (may executives see individual learners?), quiz-exhaustion policy, executive role definition | doc 06 |
 
-Closed in the latest revision: session editing (`update_session`), session completion (`complete_session`, nightly `close_finished_sessions`) and session-start reminders (`send_reminders`, 24 h/1 h learners, trainer 24 h, every 15 min), four notification templates (en/ar), `06_TESTING/UNIT_TESTS/session_edit_reminders_tests.sql` (40 assertions incl. setup, not executed). Before that: venue maintenance (`save_venue`, `remove_venue`, capacity/active checks in `create_session`), feedback reminders (`LMS_FEEDBACK_PKG.SEND_REMINDERS`, job `LMS_FEEDBACK_JOB`), `06_TESTING/UNIT_TESTS/venues_reminders_tests.sql` (26 assertions, not executed). Before that: skills framework maintenance (`LMS_SKILL_PKG`), feedback questionnaire authoring and review policy (`LMS_FEEDBACK_PKG`), anonymised feedback analytics views, `06_TESTING/UNIT_TESTS/skills_feedback_tests.sql` (42 assertions, not executed).
+Closed in the latest revision: second feedback nudge (`FEEDBACK_NUDGE2_DAYS`), calendar invites (`LMS_CALENDAR_PKG`: iCalendar REQUEST/CANCEL with stable UID, SEQUENCE, UTC times, RFC 5545 escaping and 75-octet folding, e-mail attachment built at send time, `Add to calendar` download), new templates `FEEDBACK_NUDGE`, `SESSION_UNREGISTERED`, `SESSION_UNASSIGNED`, `06_TESTING/UNIT_TESTS/feedback_nudge_invites_tests.sql` (41 assertions incl. setup, not executed). Before that: session editing (`update_session`), session completion (`complete_session`, nightly `close_finished_sessions`) and session-start reminders (`send_reminders`, 24 h/1 h learners, trainer 24 h, every 15 min), four notification templates (en/ar), `06_TESTING/UNIT_TESTS/session_edit_reminders_tests.sql` (40 assertions incl. setup, not executed). Before that: venue maintenance (`save_venue`, `remove_venue`, capacity/active checks in `create_session`), feedback reminders (`LMS_FEEDBACK_PKG.SEND_REMINDERS`, job `LMS_FEEDBACK_JOB`), `06_TESTING/UNIT_TESTS/venues_reminders_tests.sql` (26 assertions, not executed). Before that: skills framework maintenance (`LMS_SKILL_PKG`), feedback questionnaire authoring and review policy (`LMS_FEEDBACK_PKG`), anonymised feedback analytics views, `06_TESTING/UNIT_TESTS/skills_feedback_tests.sql` (42 assertions, not executed).
 
 Closed earlier: course text/objectives, lesson content and sanitising, content versions, reorder/rename/remove of modules and lessons,
 document upload with type/size/magic-byte checks, signed content URLs, question-bank authoring with immutability, quiz settings and validation,

@@ -21,7 +21,7 @@ Sessions (55) · My skills (56) · Certificates (60) · Notifications (80, via n
 | 12 | Enroll (confirm) | Modal dialog | 80 | Notifications | Interactive Report |
 | 13 | Course feedback | Modal dialog | 56 | My skills | Blank |
 | 20 | Learning player | Blank (Player template) | 90 | Verify a certificate | Public |
-| 21 | Lesson file stream | Process-only page | | | |
+| 21 | Lesson file stream | Process-only page | 57 | Calendar file download | Process-only page |
 | 30 | My learning | Cards + pill tabs | 9998 | Access error / session expired | Public |
 | 40 | Assessment | Blank | 9999 | Login (local scheme only) | Login |
 | 41 | Assessment result | Blank | | | |
@@ -171,6 +171,9 @@ select enrollment_id, course_id, title_l10n title, status, progress_pct, due_dat
 Card: progress bar, last activity (relative date), status text badge, button *Resume* (active) / *Review* (completed) → page 20; for PENDING/WAITLISTED rows (shown in ALL) the button is *Cancel request* → confirm → process `PR_CANCEL`: `lms_enrollment_pkg.cancel(:P30_ENROLLMENT_ID);` (checks ownership/scope in the package). Empty: `LMS_NO_LEARNING` + link to 10.
 Authorization `LMS_AUTH_LEARNER`. Perf: `LMS_ENR_USER_STATUS_IX`.
 
+## Page 57 — Calendar file download
+Blank page, no template output. PAP: *Arguments Must Have Checksum*; item `P57_SESSION_ID` (hidden, Value Protected = Yes). Authorization `LMS_AUTH_LEARNER` (the trainer reaches the same page from app 210 page 40 through the same process). Before Header process `PR_ICS`: `lms_calendar_pkg.stream_my_ics(:P57_SESSION_ID);` — registered learners and the session's trainer only (others: `ORA-20403`, waiting list: `ORA-20409`), `FILE_DOWNLOAD` limit applies, every download audited (`ICS_DOWNLOAD`). The file is for the signed-in user only; it contains no other participant's data.
+
 ## Page 21 — Lesson file stream (database-stored documents)
 Blank page (no template output), Authorization `LMS_AUTH_ENROLLED` is **not** used (it reads `P20_*`); the process authorises itself.
 PAP: *Arguments Must Have Checksum*; items `P21_ENROLLMENT_ID`, `P21_LESSON_ID` (hidden, Value Protected = Yes).
@@ -207,6 +210,8 @@ Path certificate shown in `R_CERT` when `status='COMPLETED'` (link to 60). "Reco
 
 ## Page 55 — Instructor-led sessions
 `R_CAL` Calendar (Display Column `start_ts`, End `end_ts`, title `title_l10n`; Source `v_lms_session_catalog`); `R_UPCOMING` Classic Report same source with `seats_left`, `my_status`, button *Register* (when `my_status is null and seats_left > 0`), *Join waiting list* (when no seats), *Unregister* (when registered). Processes: `PR_REGISTER` → `lms_session_pkg.register(:P55_SESSION_ID, :P55_STATUS);` `PR_UNREGISTER` → `lms_session_pkg.cancel_registration(:P55_SESSION_ENROLLMENT_ID);` (ownership checked inside). `R_MINE` report from `v_lms_my_sessions` (meeting link only when REGISTERED). Registered learners receive an e-mail/in-app reminder 24 h and 1 h before the start (policy `SESSION_REMINDER_*_HOURS`), and a notice if the venue, link, trainer or time changes. Calendar timezone: display in the user's browser zone; stored `TIMESTAMP WITH TIME ZONE`.
+Each row of `R_MINE` has *Add to calendar* (registered learners only) → page 57 (`P57_SESSION_ID`, checksum).
+**Calendar invites by e-mail:** registering (when a seat is confirmed, including promotion from the waiting list) sends the confirmation e-mail with an `.ics` attachment (`METHOD:REQUEST`, 60-minute alarm, join link for virtual sessions). A time, place, link or trainer change sends an updated invite with a higher `SEQUENCE`; unregistering or a cancelled session sends a `METHOD:CANCEL` that removes the entry. Waiting-list learners get the notice only, never a calendar file. Times are in UTC inside the file, so every calendar client shows them in the owner's own zone.
 
 ## Page 56 — My skills
 Authorization `LMS_AUTH_LEARNER`. `R_SKILLS` Classic Report on `v_lms_my_skills` (skill, current level, level required by my position, gap; text such as "2 of 4" plus a level bar). `R_NEXT` Cards on `v_lms_my_recommended` ("Courses that close your gaps") → page 11. Levels rise automatically when a course tagged with the skill is completed (`lms_progress_pkg`) and when a manager/HR records an assessment (app 230 page 41). Empty state: "No skills are defined for your position yet."

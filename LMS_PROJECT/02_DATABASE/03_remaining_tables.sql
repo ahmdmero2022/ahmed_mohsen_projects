@@ -333,6 +333,7 @@ CREATE TABLE lms_training_sessions (
   status         VARCHAR2(10) DEFAULT 'SCHEDULED' NOT NULL,
   min_attendance_pct NUMBER(5,2) DEFAULT 80 NOT NULL,
   instructor_reminded_at TIMESTAMP WITH TIME ZONE,       -- one reminder to the trainer; cleared on reschedule/trainer change
+  ics_sequence   NUMBER(6) DEFAULT 0 NOT NULL,           -- iCalendar SEQUENCE: +1 on every invite update/cancel
   created_by     NUMBER NOT NULL,
   CONSTRAINT lms_ts_course_fk FOREIGN KEY (course_id) REFERENCES lms_courses (course_id),
   CONSTRAINT lms_ts_venue_fk FOREIGN KEY (venue_id) REFERENCES lms_venues (venue_id),
@@ -595,9 +596,14 @@ CREATE TABLE lms_notification_queue (
   last_error       VARCHAR2(1000),
   created_at       TIMESTAMP WITH TIME ZONE DEFAULT SYSTIMESTAMP NOT NULL,
   sent_at          TIMESTAMP WITH TIME ZONE,
+  attach_kind      VARCHAR2(12),                    -- NULL or SESSION_ICS: the calendar file is built at send time
+  attach_ref       NUMBER,                          -- session_id for SESSION_ICS
+  attach_method    VARCHAR2(8),                     -- REQUEST (invite/update) or CANCEL
   CONSTRAINT lms_nq_user_fk FOREIGN KEY (user_id) REFERENCES lms_users (user_id),
   CONSTRAINT lms_nq_status_ck CHECK (status IN ('PENDING','SENT','FAILED')),
-  CONSTRAINT lms_nq_json_ck CHECK (payload IS NULL OR payload IS JSON)
+  CONSTRAINT lms_nq_json_ck CHECK (payload IS NULL OR payload IS JSON),
+  CONSTRAINT lms_nq_att_ck CHECK ((attach_kind IS NULL AND attach_ref IS NULL AND attach_method IS NULL)
+                               OR (attach_kind = 'SESSION_ICS' AND attach_ref IS NOT NULL AND attach_method IN ('REQUEST','CANCEL')))
 );
 CREATE INDEX lms_nq_due_ix ON lms_notification_queue (status, next_attempt_at);
 CREATE INDEX lms_nq_user_ix ON lms_notification_queue (user_id);

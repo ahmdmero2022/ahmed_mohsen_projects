@@ -86,7 +86,7 @@ BEGIN
   lms_session_pkg.update_session(l_s1, l_va, l_instr, 3, NULL, 80);
   chk(queued('SESSION_CHANGED') = 0, 'T-SE-09 an unchanged place/link/trainer sends no notification');
   lms_session_pkg.update_session(l_s1, l_vb, l_instr, 3, NULL, 80);
-  chk(queued('SESSION_CHANGED') = 3, 'T-SE-10 venue change notifies the 3 registered learners (' || queued('SESSION_CHANGED') || ')');
+  chk(queued('SESSION_CHANGED') = 4, 'T-SE-10 venue change notifies the 3 registered learners and the trainer (' || queued('SESSION_CHANGED') || ')');
   lms_session_pkg.update_session(l_s1, l_vb, l_hr, 3, NULL, 80);
   chk(queued('SESSION_ASSIGNED', l_hr) = 1, 'T-SE-11 the new trainer is notified');
   lms_session_pkg.update_session(l_s1, l_vb, l_instr, 3, NULL, 80);            -- back to TD_INSTRUCTOR

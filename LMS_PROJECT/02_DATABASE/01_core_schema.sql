@@ -220,6 +220,7 @@ CREATE TABLE lms_enrollments (
   time_spent_sec    NUMBER(10) DEFAULT 0 NOT NULL,
   instructor_approved_flag CHAR(1) DEFAULT 'N' NOT NULL,
   feedback_reminded_at TIMESTAMP WITH TIME ZONE,          -- set once when the feedback reminder was queued
+  feedback_reminded2_at TIMESTAMP WITH TIME ZONE,         -- set once when the second nudge was queued
   row_version       NUMBER DEFAULT 1 NOT NULL,
   CONSTRAINT lms_enr_iapp_ck CHECK (instructor_approved_flag IN ('Y','N')),
   CONSTRAINT lms_enr_user_fk FOREIGN KEY (user_id) REFERENCES lms_users (user_id),

@@ -25,7 +25,7 @@ member has a body; the validation script's table list equals the DDL. **Not run:
 | `15_views_apex.sql` | 46 views behind the APEX pages: learner, approvals, authoring, administration, monitoring, analytics |
 | `16_views_lov.sql` | 30 lookup, detail, maintenance, skills and feedback views (LOVs, course outline, prerequisites, instructors, popularity, admin lists, anonymised feedback analytics) |
 
-Counts: 56 tables, 92 views, 22 packages (165 public members), 10 application scheduler jobs (+ the rate-limit purge), 10 rate-limit policies, 28 bilingual notification templates.
+Counts: 56 tables, 92 views, 23 packages (168 public members), 10 application scheduler jobs (+ the rate-limit purge), 10 rate-limit policies, 31 bilingual notification templates.
 
 ## Prerequisites
 - Schema owner privileges: `CREATE SESSION/TABLE/VIEW/SEQUENCE/PROCEDURE/JOB`, tablespace quota; **no DBA role**.
@@ -79,3 +79,15 @@ Schema changes: `LMS_ENROLLMENTS.FEEDBACK_REMINDED_AT`, index `LMS_ENR_DONE_IX (
 | `send_reminders` (JOB `LMS_SESSION_REMINDER_JOB`, every 15 min) | REGISTERED learners only (never the waiting list): `SESSION_REMINDER_LONG_HOURS` (24) and `SESSION_REMINDER_SHORT_HOURS` (1) before the start, each once per registration; no long reminder within 3 h of registering; a short reminder suppresses a late long one; trainer reminded once at the long mark; `reschedule` and a trainer change reset the markers; rows locked with `SKIP LOCKED` |
 Schema: `LMS_SESSION_ENROLLMENTS.REMINDED_LONG_AT/REMINDED_SHORT_AT`, `LMS_TRAINING_SESSIONS.INSTRUCTOR_REMINDED_AT`. New templates: `SESSION_REMINDER`, `SESSION_INSTRUCTOR_REMINDER`, `SESSION_CHANGED`, `SESSION_ASSIGNED`. Tests: `06_TESTING/UNIT_TESTS/session_edit_reminders_tests.sql`.
 Known limits: reminders are sent in the session's stored time zone label (`TZR`), not converted to each learner's zone; the join link is included in e-mail text for registered learners only; no ICS attachment.
+
+## Second feedback nudge and calendar invites (latest addition)
+| Item | Behaviour |
+|---|---|
+| `LMS_FEEDBACK_PKG.SEND_REMINDERS` (extended) | after the first reminder, **one** final nudge `FEEDBACK_NUDGE2_DAYS` (7; 0 = off) later, only while the review/answers are still missing, within `FEEDBACK_REMINDER_WINDOW_DAYS`; marker `FEEDBACK_REMINDED2_AT`; never more than two messages per enrolment; the nudge needs a prior reminder |
+| `LMS_CALENDAR_PKG.BUILD_ICS` | internal (ACCESSIBLE BY the notification package): RFC 5545 text for one attendee — `METHOD` REQUEST/CANCEL, stable `UID session-<id>@ICS_UID_DOMAIN`, `SEQUENCE` from `LMS_TRAINING_SESSIONS.ICS_SEQUENCE`, `DTSTART/DTEND` in UTC, escaped text, 75-octet folding that never splits a multi-byte character, one `ATTENDEE` (the recipient only), join link only for REQUEST, `VALARM` `ICS_ALARM_MINUTES` (60; 0 = none); a cancelled session always yields CANCEL |
+| `LMS_CALENDAR_PKG.MY_SESSION_ICS` / `STREAM_MY_ICS` | "Add to calendar" for the signed-in registered learner or the trainer; waiting list refused; audited; rate limited |
+| Queue | `LMS_NOTIFICATION_QUEUE.ATTACH_KIND/ATTACH_REF/ATTACH_METHOD`; the file is built when the mail is sent (always current), a build failure logs `ICS_FAILED` and the mail still goes out |
+| Hooks in `LMS_SESSION_PKG` | register (REGISTERED only), waitlist promotion, unregister (`SESSION_UNREGISTERED` + CANCEL), reschedule, `update_session` (place/link/trainer; old trainer gets `SESSION_UNASSIGNED` + CANCEL), `cancel_session`, `publish_session` (trainer invite); every update bumps the sequence |
+Fix found while wiring this: the waitlist-promotion mail payload lacked `status`, so `{{status}}` would have rendered literally; it now carries it.
+Requirements/limits: database character set AL32UTF8 (folding uses `LENGTHB`); `ICS_UID_DOMAIN` must be set per environment and never changed later (it is part of every UID); `MAIL_FROM` is the organiser address; virtual-session join links travel in the e-mail and attachment to registered learners only.
+Tests: `06_TESTING/UNIT_TESTS/feedback_nudge_invites_tests.sql`.

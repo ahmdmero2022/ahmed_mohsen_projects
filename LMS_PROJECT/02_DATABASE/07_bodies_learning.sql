@@ -1104,18 +1104,41 @@ CREATE OR REPLACE PACKAGE BODY lms_session_pkg AS
     RETURN l_n > 0;
   END has_conflict;
 
-  PROCEDURE notify_participants(p_session_id IN NUMBER, p_template IN VARCHAR2) IS
+  -- Every invite update or withdrawal increments the iCalendar SEQUENCE so calendar clients apply it in order.
+  PROCEDURE bump_ics(p_session_id IN NUMBER) IS
   BEGIN
-    INSERT INTO lms_notification_queue (user_id, template_code, payload)
+    UPDATE lms_training_sessions SET ics_sequence = ics_sequence + 1 WHERE session_id = p_session_id;
+  END bump_ics;
+
+  -- p_ics_method NULL = plain notice; REQUEST/CANCEL = calendar file for REGISTERED learners only (never the waiting list).
+  PROCEDURE notify_participants(p_session_id IN NUMBER, p_template IN VARCHAR2, p_ics_method IN VARCHAR2 DEFAULT NULL) IS
+  BEGIN
+    IF p_ics_method IS NOT NULL THEN bump_ics(p_session_id); END IF;
+    INSERT INTO lms_notification_queue (user_id, template_code, payload, attach_kind, attach_ref, attach_method)
     SELECT se.user_id, p_template,
            JSON_OBJECT('course' VALUE c.title_en, 'start' VALUE TO_CHAR(s.start_ts, 'YYYY-MM-DD HH24:MI TZR'),
-                       'where' VALUE NVL(v.name_en, 'Online'))
+                       'where' VALUE NVL(v.name_en, 'Online')),
+           CASE WHEN p_ics_method IS NOT NULL AND se.status = 'REGISTERED' THEN 'SESSION_ICS' END,
+           CASE WHEN p_ics_method IS NOT NULL AND se.status = 'REGISTERED' THEN p_session_id END,
+           CASE WHEN p_ics_method IS NOT NULL AND se.status = 'REGISTERED' THEN p_ics_method END
       FROM lms_session_enrollments se
       JOIN lms_training_sessions s ON s.session_id = se.session_id
       JOIN lms_courses c ON c.course_id = s.course_id
       LEFT JOIN lms_venues v ON v.venue_id = s.venue_id
      WHERE se.session_id = p_session_id AND se.status IN ('REGISTERED','WAITLISTED');
   END notify_participants;
+
+  -- one e-mail (with calendar file) to the session's trainer
+  PROCEDURE notify_trainer(p_session_id IN NUMBER, p_user_id IN NUMBER, p_template IN VARCHAR2, p_method IN VARCHAR2) IS
+    l_course lms_courses.title_en%TYPE; l_start TIMESTAMP WITH TIME ZONE; l_where VARCHAR2(200);
+  BEGIN
+    SELECT c.title_en, s.start_ts, NVL(v.name_en, 'Online') INTO l_course, l_start, l_where
+      FROM lms_training_sessions s JOIN lms_courses c ON c.course_id = s.course_id LEFT JOIN lms_venues v ON v.venue_id = s.venue_id
+     WHERE s.session_id = p_session_id;
+    lms_notification_pkg.enqueue(p_user_id, p_template,
+      lms_util_pkg.js('course', l_course, 'start', TO_CHAR(l_start, 'YYYY-MM-DD HH24:MI TZR'), 'where', l_where),
+      'SESSION_ICS', p_session_id, p_method);
+  END notify_trainer;
 
   PROCEDURE promote_session_waitlist(p_session_id IN NUMBER) IS
     l_s     lms_training_sessions%ROWTYPE;
@@ -1132,9 +1155,11 @@ CREATE OR REPLACE PACKAGE BODY lms_session_pkg AS
                 WHERE session_id = p_session_id AND status = 'WAITLISTED'
                 ORDER BY registered_at, session_enrollment_id FETCH FIRST l_free ROWS ONLY)
       RETURNING user_id BULK COLLECT INTO l_users;
+      IF l_users.COUNT > 0 THEN bump_ics(p_session_id); END IF;
       FOR i IN 1 .. l_users.COUNT LOOP
         lms_notification_pkg.enqueue(l_users(i), 'SESSION_REGISTERED',
-          lms_util_pkg.js('start', TO_CHAR(l_s.start_ts, 'YYYY-MM-DD HH24:MI TZR')));
+          lms_util_pkg.js('start', TO_CHAR(l_s.start_ts, 'YYYY-MM-DD HH24:MI TZR'), 'status', 'REGISTERED'),
+          'SESSION_ICS', p_session_id, 'REQUEST');
       END LOOP;
     END IF;
   END promote_session_waitlist;
@@ -1245,6 +1270,10 @@ CREATE OR REPLACE PACKAGE BODY lms_session_pkg AS
     END IF;
     UPDATE lms_training_sessions SET status = 'PUBLISHED' WHERE session_id = p_session_id AND status = 'SCHEDULED';
     IF SQL%ROWCOUNT = 0 THEN RAISE_APPLICATION_ERROR(-20409, 'Only SCHEDULED sessions can be published'); END IF;
+    DECLARE l_trainer NUMBER; BEGIN
+      SELECT instructor_id INTO l_trainer FROM lms_training_sessions WHERE session_id = p_session_id;
+      notify_trainer(p_session_id, l_trainer, 'SESSION_ASSIGNED', 'REQUEST');     -- the trainer's calendar gets the session when it is published
+    END;
     lms_audit_pkg.log_event('SESSION_PUBLISH', 'SESSION', p_session_id);
   END publish_session;
 
@@ -1282,8 +1311,12 @@ CREATE OR REPLACE PACKAGE BODY lms_session_pkg AS
       INSERT INTO lms_session_enrollments (session_id, user_id, enrollment_id, status)
       VALUES (p_session_id, l_user, l_enr, p_status);
     END IF;
+    IF p_status = 'REGISTERED' THEN bump_ics(p_session_id); END IF;
     lms_notification_pkg.enqueue(l_user, 'SESSION_REGISTERED',
-      lms_util_pkg.js('start', TO_CHAR(l_s.start_ts, 'YYYY-MM-DD HH24:MI TZR'), 'status', p_status));
+      lms_util_pkg.js('start', TO_CHAR(l_s.start_ts, 'YYYY-MM-DD HH24:MI TZR'), 'status', p_status),
+      CASE WHEN p_status = 'REGISTERED' THEN 'SESSION_ICS' END,
+      CASE WHEN p_status = 'REGISTERED' THEN p_session_id END,
+      CASE WHEN p_status = 'REGISTERED' THEN 'REQUEST' END);
     lms_audit_pkg.log_event('SESSION_REGISTER', 'SESSION', p_session_id, 'SUCCESS', lms_util_pkg.js('status', p_status));
   END register;
 
@@ -1300,6 +1333,16 @@ CREATE OR REPLACE PACKAGE BODY lms_session_pkg AS
     END IF;
     UPDATE lms_session_enrollments SET status = 'CANCELLED'
      WHERE session_enrollment_id = p_session_enrollment_id AND status <> 'CANCELLED';
+    IF l_se.status = 'REGISTERED' THEN
+      -- withdraw the calendar entry that was sent when the learner registered
+      bump_ics(l_se.session_id);
+      DECLARE l_title lms_courses.title_en%TYPE; BEGIN
+        SELECT title_en INTO l_title FROM lms_courses WHERE course_id = l_s.course_id;
+        lms_notification_pkg.enqueue(l_se.user_id, 'SESSION_UNREGISTERED',
+          lms_util_pkg.js('course', l_title, 'start', TO_CHAR(l_s.start_ts, 'YYYY-MM-DD HH24:MI TZR')),
+          'SESSION_ICS', l_se.session_id, 'CANCEL');
+      END;
+    END IF;
     lms_audit_pkg.log_event('SESSION_UNREGISTER', 'SESSION', l_se.session_id);
     promote_session_waitlist(l_se.session_id);
   END cancel_registration;
@@ -1314,7 +1357,8 @@ CREATE OR REPLACE PACKAGE BODY lms_session_pkg AS
       RAISE_APPLICATION_ERROR(-20403, 'Not authorized');
     END IF;
     IF l_s.status IN ('CANCELLED','COMPLETED') THEN RAISE_APPLICATION_ERROR(-20409, 'Session cannot be cancelled'); END IF;
-    notify_participants(p_session_id, 'SESSION_CANCELLED');
+    notify_participants(p_session_id, 'SESSION_CANCELLED', 'CANCEL');
+    IF l_s.status = 'PUBLISHED' THEN notify_trainer(p_session_id, l_s.instructor_id, 'SESSION_CANCELLED', 'CANCEL'); END IF;
     UPDATE lms_training_sessions SET status = 'CANCELLED' WHERE session_id = p_session_id;
     lms_audit_pkg.log_event('SESSION_CANCEL', 'SESSION', p_session_id, 'SUCCESS',
                             lms_util_pkg.js('reason', SUBSTR(p_reason, 1, 200)));
@@ -1338,7 +1382,8 @@ CREATE OR REPLACE PACKAGE BODY lms_session_pkg AS
     END IF;
     UPDATE lms_training_sessions SET start_ts = p_start_ts, end_ts = p_end_ts, instructor_reminded_at = NULL WHERE session_id = p_session_id;
     UPDATE lms_session_enrollments SET reminded_long_at = NULL, reminded_short_at = NULL WHERE session_id = p_session_id;   -- new time, new reminders
-    notify_participants(p_session_id, 'SESSION_RESCHEDULED');
+    notify_participants(p_session_id, 'SESSION_RESCHEDULED', 'REQUEST');
+    IF l_s.status = 'PUBLISHED' THEN notify_trainer(p_session_id, l_s.instructor_id, 'SESSION_RESCHEDULED', 'REQUEST'); END IF;
     lms_audit_pkg.log_event('SESSION_RESCHEDULE', 'SESSION', p_session_id);
   END reschedule;
 
@@ -1431,10 +1476,14 @@ CREATE OR REPLACE PACKAGE BODY lms_session_pkg AS
      WHERE session_id = p_session_id;
     IF p_seats > l_s.seats THEN promote_session_waitlist(p_session_id); END IF;
     IF l_changed THEN
-      notify_participants(p_session_id, 'SESSION_CHANGED');
-      IF p_instructor_id <> l_s.instructor_id THEN
-        lms_notification_pkg.enqueue(p_instructor_id, 'SESSION_ASSIGNED',
-          lms_util_pkg.js('start', TO_CHAR(l_s.start_ts, 'YYYY-MM-DD HH24:MI TZR')));
+      notify_participants(p_session_id, 'SESSION_CHANGED', 'REQUEST');                 -- updated invite (SEQUENCE + 1)
+      IF l_s.status = 'PUBLISHED' THEN                                                -- an unpublished session is not in anyone's calendar yet
+        IF p_instructor_id <> l_s.instructor_id THEN
+          notify_trainer(p_session_id, l_s.instructor_id, 'SESSION_UNASSIGNED', 'CANCEL');
+          notify_trainer(p_session_id, p_instructor_id, 'SESSION_ASSIGNED', 'REQUEST');
+        ELSE
+          notify_trainer(p_session_id, p_instructor_id, 'SESSION_CHANGED', 'REQUEST');
+        END IF;
       END IF;
     END IF;
     lms_audit_pkg.log_event('SESSION_UPDATE', 'SESSION', p_session_id, 'SUCCESS',

@@ -6,11 +6,13 @@
 -- -------------------------------------------------------- NOTIFICATION -------
 CREATE OR REPLACE PACKAGE BODY lms_notification_pkg AS
 
-  PROCEDURE enqueue(p_user_id IN NUMBER, p_template_code IN VARCHAR2, p_payload IN VARCHAR2 DEFAULT NULL) IS
+  PROCEDURE enqueue(p_user_id IN NUMBER, p_template_code IN VARCHAR2, p_payload IN VARCHAR2 DEFAULT NULL,
+                    p_attach_kind IN VARCHAR2 DEFAULT NULL, p_attach_ref IN NUMBER DEFAULT NULL,
+                    p_attach_method IN VARCHAR2 DEFAULT NULL) IS
   BEGIN
     IF p_user_id IS NULL THEN RETURN; END IF;
-    INSERT INTO lms_notification_queue (user_id, template_code, payload)
-    VALUES (p_user_id, p_template_code, p_payload);
+    INSERT INTO lms_notification_queue (user_id, template_code, payload, attach_kind, attach_ref, attach_method)
+    VALUES (p_user_id, p_template_code, p_payload, p_attach_kind, p_attach_ref, p_attach_method);
   END enqueue;
 
   /* Replaces {{key}} placeholders with values from the JSON payload. */
@@ -28,7 +30,7 @@ CREATE OR REPLACE PACKAGE BODY lms_notification_pkg AS
 
   PROCEDURE process_queue(p_batch IN PLS_INTEGER DEFAULT 200) IS
     CURSOR c_due IS
-      SELECT queue_id, user_id, template_code, payload, attempts
+      SELECT queue_id, user_id, template_code, payload, attempts, attach_kind, attach_ref, attach_method
         FROM lms_notification_queue
        WHERE status = 'PENDING' AND next_attempt_at <= SYSTIMESTAMP
        ORDER BY queue_id
@@ -42,6 +44,8 @@ CREATE OR REPLACE PACKAGE BODY lms_notification_pkg AS
     l_wait    NUMBER;
     l_from    VARCHAR2(254) := lms_util_pkg.get_setting('MAIL_FROM');
     l_ws      VARCHAR2(100) := lms_util_pkg.get_setting('APEX_WORKSPACE');
+    l_mail_id NUMBER;
+    l_ics     CLOB;
   BEGIN
     -- APEX_MAIL needs a workspace context when it runs from a scheduler job.
     IF l_ws IS NOT NULL AND SYS_CONTEXT('APEX$SESSION', 'APP_ID') IS NULL THEN
@@ -72,9 +76,20 @@ CREATE OR REPLACE PACKAGE BODY lms_notification_pkg AS
         VALUES (r.user_id, r.template_code, l_subj, SUBSTR(l_body, 1, 2000), l_link);
 
         IF l_user.email IS NOT NULL AND l_from IS NOT NULL THEN
-          apex_mail.send(p_to => l_user.email, p_from => l_from, p_subj => l_subj,
+          l_mail_id := apex_mail.send(p_to => l_user.email, p_from => l_from, p_subj => l_subj,
                          p_body => l_body,
                          p_body_html => '<div>' || REPLACE(apex_escape.html(l_body), CHR(10), '<br>') || '</div>');
+          IF r.attach_kind = 'SESSION_ICS' THEN
+            -- calendar file is built now, so it always carries the latest time/place/SEQUENCE; a failure must not lose the mail
+            BEGIN
+              l_ics := lms_calendar_pkg.build_ics(r.attach_ref, r.user_id, r.attach_method);
+              apex_mail.add_attachment(p_mail_id => l_mail_id, p_attachment => apex_util.clob_to_blob(l_ics, 'AL32UTF8'),
+                                       p_filename => 'session.ics',
+                                       p_mime_type => 'text/calendar; method=' || r.attach_method || '; charset=UTF-8');
+            EXCEPTION WHEN OTHERS THEN
+              lms_audit_pkg.log_security('ICS_FAILED', r.user_id, NULL, r.template_code, 'WARN', SUBSTR(SQLERRM, 1, 500));
+            END;
+          END IF;
         END IF;
 
         UPDATE lms_notification_queue SET status = 'SENT', sent_at = SYSTIMESTAMP, attempts = attempts + 1,

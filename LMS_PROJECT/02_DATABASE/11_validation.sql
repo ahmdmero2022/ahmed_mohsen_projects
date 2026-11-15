@@ -41,7 +41,7 @@ BEGIN
       'LMS_UTIL_PKG','LMS_SECURITY_PKG','LMS_AUDIT_PKG','LMS_RATE_LIMIT_PKG','LMS_NOTIFICATION_PKG','LMS_APPROVAL_PKG',
       'LMS_USER_PKG','LMS_HR_SYNC_PKG','LMS_COURSE_PKG','LMS_ENROLLMENT_PKG','LMS_PROGRESS_PKG','LMS_ASSESSMENT_PKG',
       'LMS_LEARNING_PATH_PKG','LMS_SESSION_PKG','LMS_CERTIFICATION_PKG','LMS_FEEDBACK_PKG','LMS_SKILL_PKG','LMS_REPORTING_PKG',
-      'LMS_SECRET_PKG','LMS_APEX_PKG','LMS_ADMIN_PKG','LMS_ORDS_PKG'))) LOOP
+      'LMS_SECRET_PKG','LMS_APEX_PKG','LMS_ADMIN_PKG','LMS_ORDS_PKG','LMS_CALENDAR_PKG'))) LOOP
     SELECT COUNT(*) INTO l_n FROM user_objects
      WHERE object_name = r.p AND object_type IN ('PACKAGE','PACKAGE BODY') AND status = 'VALID';
     chk(l_n = 2, 'package ' || r.p || ' (spec+body valid)');
@@ -69,10 +69,10 @@ BEGIN
   SELECT COUNT(*) INTO l_n FROM lms_permissions;               chk(l_n >= 22, 'permissions seeded (' || l_n || ')');
   SELECT COUNT(*) INTO l_n FROM lms_role_permissions;          chk(l_n >= 50, 'role-permission rows seeded (' || l_n || ')');
   SELECT COUNT(*) INTO l_n FROM lms_rate_limit_policies WHERE enabled_flag = 'Y'; chk(l_n >= 10, 'rate-limit policies incl. CERT_VERIFY, HR_SYNC (' || l_n || ')');
-  SELECT COUNT(*) INTO l_n FROM lms_notification_templates;    chk(l_n >= 56, 'notification templates en+ar (' || l_n || ')');
+  SELECT COUNT(*) INTO l_n FROM lms_notification_templates;    chk(l_n >= 62, 'notification templates en+ar (' || l_n || ')');
   SELECT COUNT(DISTINCT template_code) INTO l_n FROM lms_notification_templates t
    WHERE (SELECT COUNT(*) FROM lms_notification_templates x WHERE x.template_code = t.template_code) = 2;
-  chk(l_n >= 28, 'every template has both languages (' || l_n || ')');
+  chk(l_n >= 31, 'every template has both languages (' || l_n || ')');
   SELECT COUNT(*) INTO l_n FROM lms_system_settings WHERE setting_key IN ('RETAIN_AUDIT_DAYS','QUIZ_GRACE_SECONDS','RENEWAL_WINDOW_DAYS');
   chk(l_n = 3, 'core settings present');
 

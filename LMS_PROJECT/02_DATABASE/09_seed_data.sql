@@ -119,6 +119,9 @@ USING (SELECT 'RETAIN_AUDIT_DAYS' k, '2555' v, 'Audit log retention (days)' d FR
        SELECT 'REVIEW_EDIT_DAYS', '0', 'Days a learner may edit a review (0 = reviews are final)' FROM dual UNION ALL
        SELECT 'FEEDBACK_REMINDER_DAYS', '3', 'Days after completion to remind a learner to give feedback (0 = off)' FROM dual UNION ALL
        SELECT 'FEEDBACK_REMINDER_WINDOW_DAYS', '30', 'Do not remind for completions older than this many days' FROM dual UNION ALL
+       SELECT 'FEEDBACK_NUDGE2_DAYS', '7', 'Days after the first feedback reminder for the final nudge (0 = off)' FROM dual UNION ALL
+       SELECT 'ICS_ALARM_MINUTES', '60', 'Calendar-invite alarm: minutes before the start (0 = no alarm)' FROM dual UNION ALL
+       SELECT 'ICS_UID_DOMAIN', 'lms.example.invalid', 'Domain part of calendar UIDs (set per environment, never change later)' FROM dual UNION ALL
        SELECT 'SESSION_REMINDER_LONG_HOURS', '24', 'First session reminder this many hours before the start (0 = off)' FROM dual UNION ALL
        SELECT 'SESSION_REMINDER_SHORT_HOURS', '1', 'Second session reminder this many hours before the start (0 = off)' FROM dual UNION ALL
        SELECT 'SESSION_AUTOCLOSE_DAYS', '7', 'Complete PUBLISHED sessions this many days after they ended (0 = off)' FROM dual) s
@@ -216,6 +219,12 @@ BEGIN
     'انتهت صلاحية الشهادة: {{title}}', 'انتهت صلاحية شهادتك "{{title}}".');
   t('FEEDBACK_REMINDER', 'How was "{{course}}"?', 'You completed "{{course}}". Please take a minute to rate it and tell us what could be better.',
     'ما رأيك في "{{course}}"؟', 'لقد أكملت دورة "{{course}}". نرجو أن تقيّمها وتخبرنا بما يمكن تحسينه، فذلك لا يستغرق سوى دقيقة.');
+  t('FEEDBACK_NUDGE', 'Last call: rate "{{course}}"', 'It is not too late to share your feedback on "{{course}}". It takes about a minute and helps the next learners.',
+    'فرصة أخيرة: قيّم "{{course}}"', 'ما زال بإمكانك مشاركة رأيك في دورة "{{course}}". يستغرق ذلك دقيقة واحدة ويفيد المتعلمين القادمين.');
+  t('SESSION_UNREGISTERED', 'Registration cancelled: {{course}}', 'Your registration for the "{{course}}" session on {{start}} was cancelled. The calendar entry is withdrawn.',
+    'تم إلغاء التسجيل: {{course}}', 'تم إلغاء تسجيلك في جلسة "{{course}}" بتاريخ {{start}}، وسيُسحب الموعد من تقويمك.');
+  t('SESSION_UNASSIGNED', 'You are no longer the trainer: {{course}}', 'You were replaced as trainer of the "{{course}}" session on {{start}}. The calendar entry is withdrawn.',
+    'لم تعد مدرّب الجلسة: {{course}}', 'تم استبدالك كمدرّب لجلسة "{{course}}" بتاريخ {{start}}، وسيُسحب الموعد من تقويمك.');
   t('SESSION_REMINDER', 'Reminder: {{course}} starts {{start}}', 'Your session of "{{course}}" starts {{start}}. Where: {{where}}.',
     'تذكير: تبدأ جلسة {{course}} في {{start}}', 'تبدأ جلسة "{{course}}" في {{start}}. المكان: {{where}}.');
   t('SESSION_INSTRUCTOR_REMINDER', 'You teach {{course}} on {{start}}', 'You are the trainer for "{{course}}" starting {{start}}. Registered learners: {{registered}}.',

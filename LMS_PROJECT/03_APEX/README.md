@@ -7,7 +7,7 @@ definitions, regions, dynamic actions and processes are *build instructions*, no
 |---|---|
 | `SHARED_COMPONENTS/README.md` | Application settings, authentication, security headers, 25 authorization schemes (exact PL/SQL), items, LOVs, navigation, theme, conventions |
 | `SHARED_COMPONENTS/text_messages.csv` | 72 text messages (EN + draft AR) for errors, JavaScript, statuses, lookups |
-| `PAGE_SPECIFICATIONS/app200_learning_portal.md` | 26 pages: dashboard, catalog, course details, enrol, player, my learning, assessment, paths, sessions, certificates, preferences, notifications, public verification |
+| `PAGE_SPECIFICATIONS/app200_learning_portal.md` | 27 pages: dashboard, catalog, course details, enrol, player, my learning, assessment, paths, sessions, certificates, preferences, notifications, public verification |
 | `PAGE_SPECIFICATIONS/app210_instructor_portal.md` | Dashboard, my courses, 6-step course builder (incl. course skills and feedback form), course feedback analytics, lesson content/upload, question bank, grading, sessions/attendance, learner progress |
 | `PAGE_SPECIFICATIONS/app220_administration.md` | Courses, approvals, enrolments, mandatory assignments, schedule, certificates, categories, settings, templates, users, roles matrix, audit/security/integration logs, rate limits, monitoring |
 | `PAGE_SPECIFICATIONS/app230_240_management_analytics.md` | Manager dashboard/team/approvals/assign/skill gaps, HR skills framework (42–44); executive dashboard, reports, drill-down |

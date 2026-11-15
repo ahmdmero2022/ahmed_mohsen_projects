@@ -10,7 +10,7 @@ Design package and implementation blueprint. Document version 0.1 (draft for rev
 | SQL/PL/SQL in `02_DATABASE/` | **Written, NOT compiled or executed.** No Oracle 19c instance was available. Treat as reviewed code that must be installed (`00_install.sql`) and tested in a dev schema |
 | APEX application export (`f*.sql`) | **Not produced.** Page specifications only; cannot be validated without an APEX 24.1 workspace |
 | Test results | **None.** Test cases are defined; all "Actual result" fields are blank |
-| Database scripts (56 tables, 92 views, 22 packages, seeds, jobs, validation, rollback) | **Written, not executed.** Static consistency checks run; see `02_DATABASE/README.md` |
+| Database scripts (56 tables, 92 views, 23 packages, seeds, jobs, validation, rollback) | **Written, not executed.** Static consistency checks run; see `02_DATABASE/README.md` |
 | APEX page specifications (5 apps, ~75 pages), shared components, CSS/JS | **Written as build specs**; no APEX export; JS syntax-checked only; see `03_APEX/README.md` |
 | ORDS modules, OpenAPI contract, smoke test | **Written, not executed**; see `05_INTEGRATIONS/README.md` |
 

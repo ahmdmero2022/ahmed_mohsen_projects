@@ -17,7 +17,9 @@
 CREATE OR REPLACE PACKAGE lms_notification_pkg AS
   /* Queue a notification (same transaction as the business change). p_payload = JSON object of
      placeholder values; optional key "link" becomes the in-app link. */
-  PROCEDURE enqueue(p_user_id IN NUMBER, p_template_code IN VARCHAR2, p_payload IN VARCHAR2 DEFAULT NULL);
+  PROCEDURE enqueue(p_user_id IN NUMBER, p_template_code IN VARCHAR2, p_payload IN VARCHAR2 DEFAULT NULL,
+                    p_attach_kind IN VARCHAR2 DEFAULT NULL, p_attach_ref IN NUMBER DEFAULT NULL,
+                    p_attach_method IN VARCHAR2 DEFAULT NULL);   -- SESSION_ICS + session id + REQUEST|CANCEL adds a calendar file to the e-mail
   /* JOB: renders templates (user language, English fallback), writes in-app rows, sends e-mail,
      retries with back-off 1/5/30/60 min, FAILED after 5 attempts. Commits (job owns the txn). */
   PROCEDURE process_queue(p_batch IN PLS_INTEGER DEFAULT 200);
@@ -260,13 +262,29 @@ CREATE OR REPLACE PACKAGE lms_certification_pkg AS
 END lms_certification_pkg;
 /
 
+/* iCalendar (RFC 5545) invites for training sessions. */
+CREATE OR REPLACE PACKAGE lms_calendar_pkg AS
+  /* Calendar text for ONE attendee (REQUEST = invite/update, CANCEL = withdrawal). Internal: used when the mail is sent, so it
+     can address any attendee; therefore callable only by the notification package. */
+  FUNCTION build_ics(p_session_id IN NUMBER, p_user_id IN NUMBER, p_method IN VARCHAR2) RETURN CLOB
+    ACCESSIBLE BY (PACKAGE lms_notification_pkg, PACKAGE lms_calendar_pkg);
+  /* "Add to calendar" for the signed-in user: registered learners and the session's trainer only. */
+  FUNCTION my_session_ics(p_session_id IN NUMBER) RETURN CLOB;
+  /* Page process (Blank page): sends the file as a download. */
+  PROCEDURE stream_my_ics(p_session_id IN NUMBER);
+END lms_calendar_pkg;
+/
+
 CREATE OR REPLACE PACKAGE lms_feedback_pkg AS
   PROCEDURE submit_review(p_enrollment_id IN NUMBER, p_course_rating IN NUMBER,
                           p_instructor_rating IN NUMBER DEFAULT NULL, p_review_text IN VARCHAR2 DEFAULT NULL);
   PROCEDURE submit_answer(p_enrollment_id IN NUMBER, p_question_id IN NUMBER,
                           p_rating IN NUMBER DEFAULT NULL, p_comment IN VARCHAR2 DEFAULT NULL);
   PROCEDURE set_review_visibility(p_review_id IN NUMBER, p_visible IN BOOLEAN);
-  /* JOB (daily): one reminder per completed enrolment, FEEDBACK_REMINDER_DAYS after completion (0 = off) and not older than
+  /* JOB (daily): TWO nudges per completed enrolment at most: the first reminder (below) and one final nudge
+     FEEDBACK_NUDGE2_DAYS (7; 0 = off) after the first, while the review/answers are still missing and the completion is
+     inside FEEDBACK_REMINDER_WINDOW_DAYS. Counts both in the returned total.
+     First reminder: one reminder per completed enrolment, FEEDBACK_REMINDER_DAYS after completion (0 = off) and not older than
      FEEDBACK_REMINDER_WINDOW_DAYS, only while a review or a questionnaire answer is still missing and the learner is ACTIVE.
      Returns the number of reminders queued (for the job log). */
   FUNCTION send_reminders RETURN NUMBER;
