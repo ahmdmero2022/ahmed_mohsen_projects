@@ -248,6 +248,19 @@ CREATE OR REPLACE PACKAGE lms_feedback_pkg AS
   PROCEDURE submit_answer(p_enrollment_id IN NUMBER, p_question_id IN NUMBER,
                           p_rating IN NUMBER DEFAULT NULL, p_comment IN VARCHAR2 DEFAULT NULL);
   PROCEDURE set_review_visibility(p_review_id IN NUMBER, p_visible IN BOOLEAN);
+  /* Owner may edit a review for REVIEW_EDIT_DAYS days after it was written (0 = reviews are final). */
+  PROCEDURE update_review(p_review_id IN NUMBER, p_course_rating IN NUMBER,
+                          p_instructor_rating IN NUMBER DEFAULT NULL, p_review_text IN VARCHAR2 DEFAULT NULL);
+  /* ---- questionnaire authoring (permission COURSE_PUBLISH) ---- */
+  FUNCTION save_form(p_form_id IN NUMBER, p_name_en IN VARCHAR2, p_name_ar IN VARCHAR2, p_active_flag IN VARCHAR2) RETURN NUMBER;
+  /* New form with copies of all questions; use it to change a form that already has responses. */
+  FUNCTION clone_form(p_form_id IN NUMBER) RETURN NUMBER;
+  /* p_question_id NULL = create. When responses exist only SORT_ORDER may change. */
+  FUNCTION save_form_question(p_question_id IN NUMBER, p_form_id IN NUMBER, p_text_en IN VARCHAR2, p_text_ar IN VARCHAR2,
+                              p_answer_type IN VARCHAR2, p_sort_order IN NUMBER) RETURN NUMBER;
+  PROCEDURE remove_form_question(p_question_id IN NUMBER);
+  /* Attach (or with NULL detach) a form to a course. Refused once feedback was collected with a different form. */
+  PROCEDURE assign_form(p_course_id IN NUMBER, p_form_id IN NUMBER);
 END lms_feedback_pkg;
 /
 
@@ -255,6 +268,18 @@ CREATE OR REPLACE PACKAGE lms_skill_pkg AS
   PROCEDURE assess_skill(p_user_id IN NUMBER, p_skill_id IN NUMBER, p_level IN NUMBER);
   /* Courses that close the user's skill gaps (self, or a user the caller may see). */
   FUNCTION recommended_courses(p_user_id IN NUMBER DEFAULT NULL) RETURN SYS_REFCURSOR;
+  /* ---- skills framework maintenance (permission SKILL_MANAGE) ---- */
+  /* p_skill_id NULL = create. Code is upper-cased; A-Z 0-9 _ - only. */
+  FUNCTION save_skill(p_skill_id IN NUMBER, p_skill_code IN VARCHAR2, p_name_en IN VARCHAR2, p_name_ar IN VARCHAR2,
+                      p_skill_group IN VARCHAR2, p_active_flag IN VARCHAR2) RETURN NUMBER;
+  /* Only an unused skill can be deleted; otherwise deactivate it with save_skill. */
+  PROCEDURE remove_skill(p_skill_id IN NUMBER);
+  /* Employees -> Positions -> Required skills. p_required_level NULL removes the requirement (levels 1-5). */
+  PROCEDURE set_position_skill(p_position_id IN NUMBER, p_skill_id IN NUMBER, p_required_level IN NUMBER);
+  /* Courses -> Skills they build. Allowed for SKILL_MANAGE or the course's authors. NULL removes the link. */
+  PROCEDURE set_course_skill(p_course_id IN NUMBER, p_skill_id IN NUMBER, p_level_gained IN NUMBER);
+  /* Adds the skill requirements of one position to another (never overwrites existing requirements). Returns rows added. */
+  FUNCTION copy_position_skills(p_from_position IN NUMBER, p_to_position IN NUMBER) RETURN NUMBER;
 END lms_skill_pkg;
 /
 

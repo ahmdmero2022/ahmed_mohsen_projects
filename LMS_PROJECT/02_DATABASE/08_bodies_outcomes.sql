@@ -252,6 +252,143 @@ CREATE OR REPLACE PACKAGE BODY lms_feedback_pkg AS
     IF SQL%ROWCOUNT = 0 THEN RAISE_APPLICATION_ERROR(-20404, 'Review not found'); END IF;
     lms_audit_pkg.log_event('REVIEW_VISIBILITY', 'REVIEW', p_review_id);
   END set_review_visibility;
+  -- ------------------------------------------------------------------ review policy -----
+  PROCEDURE update_review(p_review_id IN NUMBER, p_course_rating IN NUMBER,
+                          p_instructor_rating IN NUMBER DEFAULT NULL, p_review_text IN VARCHAR2 DEFAULT NULL) IS
+    l_user NUMBER := lms_security_pkg.current_user_id;
+    l_r    lms_course_reviews%ROWTYPE;
+    l_days NUMBER := lms_util_pkg.get_number('REVIEW_EDIT_DAYS', 0);
+  BEGIN
+    BEGIN SELECT * INTO l_r FROM lms_course_reviews WHERE review_id = p_review_id FOR UPDATE;
+    EXCEPTION WHEN NO_DATA_FOUND THEN RAISE_APPLICATION_ERROR(-20404, 'Review not found'); END;
+    IF l_r.user_id <> l_user THEN
+      lms_audit_pkg.log_event('ACCESS_DENIED', 'REVIEW', p_review_id, 'DENIED');
+      RAISE_APPLICATION_ERROR(-20403, 'Not authorized');
+    END IF;
+    IF l_days <= 0 OR l_r.created_at < SYSTIMESTAMP - NUMTODSINTERVAL(l_days, 'DAY') THEN
+      RAISE_APPLICATION_ERROR(-20409, 'This review can no longer be edited');
+    END IF;
+    IF p_course_rating NOT BETWEEN 1 AND 5 OR (p_instructor_rating IS NOT NULL AND p_instructor_rating NOT BETWEEN 1 AND 5) THEN
+      RAISE_APPLICATION_ERROR(-20400, 'Ratings must be between 1 and 5');
+    END IF;
+    UPDATE lms_course_reviews SET course_rating = p_course_rating, instructor_rating = p_instructor_rating,
+           review_text = SUBSTR(p_review_text, 1, 2000) WHERE review_id = p_review_id;
+    lms_audit_pkg.log_event('REVIEW_UPDATE', 'REVIEW', p_review_id);
+  END update_review;
+
+  -- ------------------------------------------------------------ questionnaire authoring -----
+  FUNCTION responses_for_question(p_question_id IN NUMBER) RETURN NUMBER IS
+    l_n NUMBER;
+  BEGIN
+    SELECT COUNT(*) INTO l_n FROM lms_feedback_responses WHERE question_id = p_question_id AND ROWNUM = 1;
+    RETURN l_n;
+  END responses_for_question;
+
+  FUNCTION responses_for_form(p_form_id IN NUMBER) RETURN NUMBER IS
+    l_n NUMBER;
+  BEGIN
+    SELECT COUNT(*) INTO l_n FROM lms_feedback_responses r JOIN lms_feedback_questions q ON q.question_id = r.question_id
+     WHERE q.form_id = p_form_id AND ROWNUM = 1;
+    RETURN l_n;
+  END responses_for_form;
+
+  FUNCTION save_form(p_form_id IN NUMBER, p_name_en IN VARCHAR2, p_name_ar IN VARCHAR2, p_active_flag IN VARCHAR2) RETURN NUMBER IS
+    l_id NUMBER := p_form_id; l_n NUMBER;
+  BEGIN
+    lms_security_pkg.require_permission('COURSE_PUBLISH');
+    lms_rate_limit_pkg.enforce_limit('ADMIN_WRITE');
+    IF p_name_en IS NULL OR LENGTH(TRIM(p_name_en)) = 0 OR p_active_flag NOT IN ('Y','N') THEN
+      RAISE_APPLICATION_ERROR(-20400, 'Invalid form');
+    END IF;
+    IF l_id IS NULL THEN
+      INSERT INTO lms_feedback_forms (name_en, name_ar, active_flag) VALUES (p_name_en, p_name_ar, p_active_flag) RETURNING form_id INTO l_id;
+    ELSE
+      IF p_active_flag = 'N' THEN
+        SELECT COUNT(*) INTO l_n FROM lms_courses WHERE feedback_form_id = l_id AND status = 'PUBLISHED';
+        IF l_n > 0 THEN RAISE_APPLICATION_ERROR(-20409, 'The form is used by published courses and cannot be deactivated'); END IF;
+      END IF;
+      UPDATE lms_feedback_forms SET name_en = p_name_en, name_ar = p_name_ar, active_flag = p_active_flag WHERE form_id = l_id;
+      IF SQL%ROWCOUNT = 0 THEN RAISE_APPLICATION_ERROR(-20404, 'Form not found'); END IF;
+    END IF;
+    lms_audit_pkg.log_event('FEEDBACK_FORM_SAVE', 'FEEDBACK_FORM', l_id);
+    RETURN l_id;
+  END save_form;
+
+  FUNCTION clone_form(p_form_id IN NUMBER) RETURN NUMBER IS
+    l_new NUMBER; l_f lms_feedback_forms%ROWTYPE;
+  BEGIN
+    lms_security_pkg.require_permission('COURSE_PUBLISH');
+    BEGIN SELECT * INTO l_f FROM lms_feedback_forms WHERE form_id = p_form_id;
+    EXCEPTION WHEN NO_DATA_FOUND THEN RAISE_APPLICATION_ERROR(-20404, 'Form not found'); END;
+    INSERT INTO lms_feedback_forms (name_en, name_ar, active_flag)
+    VALUES (SUBSTR(l_f.name_en, 1, 185) || ' (copy)',
+            CASE WHEN l_f.name_ar IS NOT NULL THEN SUBSTR(l_f.name_ar, 1, 185) || ' (نسخة)' END, 'Y')
+    RETURNING form_id INTO l_new;
+    INSERT INTO lms_feedback_questions (form_id, text_en, text_ar, answer_type, sort_order)
+    SELECT l_new, text_en, text_ar, answer_type, sort_order FROM lms_feedback_questions WHERE form_id = p_form_id;
+    lms_audit_pkg.log_event('FEEDBACK_FORM_CLONE', 'FEEDBACK_FORM', l_new, 'SUCCESS', lms_util_pkg.js('from', p_form_id));
+    RETURN l_new;
+  END clone_form;
+
+  FUNCTION save_form_question(p_question_id IN NUMBER, p_form_id IN NUMBER, p_text_en IN VARCHAR2, p_text_ar IN VARCHAR2,
+                              p_answer_type IN VARCHAR2, p_sort_order IN NUMBER) RETURN NUMBER IS
+    l_id NUMBER := p_question_id; l_old lms_feedback_questions%ROWTYPE;
+  BEGIN
+    lms_security_pkg.require_permission('COURSE_PUBLISH');
+    IF p_text_en IS NULL OR LENGTH(TRIM(p_text_en)) = 0 OR LENGTH(p_text_en) > 1000 OR p_answer_type NOT IN ('RATING','TEXT') THEN
+      RAISE_APPLICATION_ERROR(-20400, 'Invalid question');
+    END IF;
+    IF l_id IS NULL THEN
+      INSERT INTO lms_feedback_questions (form_id, text_en, text_ar, answer_type, sort_order)
+      VALUES (p_form_id, p_text_en, p_text_ar, p_answer_type, NVL(p_sort_order, 0)) RETURNING question_id INTO l_id;
+    ELSE
+      BEGIN SELECT * INTO l_old FROM lms_feedback_questions WHERE question_id = l_id AND form_id = p_form_id FOR UPDATE;
+      EXCEPTION WHEN NO_DATA_FOUND THEN RAISE_APPLICATION_ERROR(-20404, 'Question not found'); END;
+      IF responses_for_question(l_id) > 0 AND (l_old.text_en <> p_text_en OR NVL(l_old.text_ar, '~') <> NVL(p_text_ar, '~')
+                                              OR l_old.answer_type <> p_answer_type) THEN
+        RAISE_APPLICATION_ERROR(-20409, 'This question already has responses; only its order can change. Clone the form to change the wording.');
+      END IF;
+      UPDATE lms_feedback_questions SET text_en = p_text_en, text_ar = p_text_ar, answer_type = p_answer_type,
+             sort_order = NVL(p_sort_order, 0) WHERE question_id = l_id;
+    END IF;
+    lms_audit_pkg.log_event('FEEDBACK_Q_SAVE', 'FEEDBACK_QUESTION', l_id);
+    RETURN l_id;
+  END save_form_question;
+
+  PROCEDURE remove_form_question(p_question_id IN NUMBER) IS
+  BEGIN
+    lms_security_pkg.require_permission('COURSE_PUBLISH');
+    IF responses_for_question(p_question_id) > 0 THEN
+      RAISE_APPLICATION_ERROR(-20409, 'This question already has responses and cannot be removed');
+    END IF;
+    DELETE FROM lms_feedback_questions WHERE question_id = p_question_id;
+    IF SQL%ROWCOUNT = 0 THEN RAISE_APPLICATION_ERROR(-20404, 'Question not found'); END IF;
+    lms_audit_pkg.log_event('FEEDBACK_Q_REMOVE', 'FEEDBACK_QUESTION', p_question_id);
+  END remove_form_question;
+
+  PROCEDURE assign_form(p_course_id IN NUMBER, p_form_id IN NUMBER) IS
+    l_old NUMBER; l_n NUMBER; l_flag lms_feedback_forms.active_flag%TYPE;
+  BEGIN
+    IF NOT (lms_security_pkg.has_permission('COURSE_PUBLISH') OR lms_course_pkg.can_manage_course(p_course_id, 'COURSE_AUTHOR')) THEN
+      lms_audit_pkg.log_event('ACCESS_DENIED', 'COURSE', p_course_id, 'DENIED');
+      RAISE_APPLICATION_ERROR(-20403, 'Not authorized');
+    END IF;
+    BEGIN SELECT feedback_form_id INTO l_old FROM lms_courses WHERE course_id = p_course_id FOR UPDATE;
+    EXCEPTION WHEN NO_DATA_FOUND THEN RAISE_APPLICATION_ERROR(-20404, 'Course not found'); END;
+    IF p_form_id IS NOT NULL THEN
+      BEGIN SELECT active_flag INTO l_flag FROM lms_feedback_forms WHERE form_id = p_form_id;
+      EXCEPTION WHEN NO_DATA_FOUND THEN RAISE_APPLICATION_ERROR(-20404, 'Form not found'); END;
+      IF l_flag <> 'Y' THEN RAISE_APPLICATION_ERROR(-20409, 'The form is inactive'); END IF;
+    END IF;
+    IF NVL(l_old, -1) <> NVL(p_form_id, -1) AND l_old IS NOT NULL THEN
+      SELECT COUNT(*) INTO l_n FROM lms_feedback_responses r JOIN lms_enrollments e ON e.enrollment_id = r.enrollment_id
+       WHERE e.course_id = p_course_id AND ROWNUM = 1;
+      IF l_n > 0 THEN RAISE_APPLICATION_ERROR(-20409, 'Feedback was already collected with the current form'); END IF;
+    END IF;
+    UPDATE lms_courses SET feedback_form_id = p_form_id, updated_at = SYSTIMESTAMP, row_version = row_version + 1
+     WHERE course_id = p_course_id;
+    lms_audit_pkg.log_event('FEEDBACK_FORM_ASSIGN', 'COURSE', p_course_id, 'SUCCESS', lms_util_pkg.js('form', NVL(TO_CHAR(p_form_id), 'NONE')));
+  END assign_form;
 END lms_feedback_pkg;
 /
 
@@ -300,6 +437,114 @@ CREATE OR REPLACE PACKAGE BODY lms_skill_pkg AS
        FETCH FIRST 10 ROWS ONLY;
     RETURN l_c;
   END recommended_courses;
+  -- ---------------------------------------------------------------- framework maintenance -----
+  FUNCTION save_skill(p_skill_id IN NUMBER, p_skill_code IN VARCHAR2, p_name_en IN VARCHAR2, p_name_ar IN VARCHAR2,
+                      p_skill_group IN VARCHAR2, p_active_flag IN VARCHAR2) RETURN NUMBER IS
+    l_id   NUMBER := p_skill_id;
+    l_code VARCHAR2(30) := UPPER(TRIM(p_skill_code));
+  BEGIN
+    lms_security_pkg.require_permission('SKILL_MANAGE');
+    lms_rate_limit_pkg.enforce_limit('ADMIN_WRITE');
+    IF l_code IS NULL OR NOT REGEXP_LIKE(l_code, '^[A-Z0-9_-]{2,30}$') OR p_name_en IS NULL OR LENGTH(TRIM(p_name_en)) = 0
+       OR p_active_flag NOT IN ('Y','N') THEN
+      RAISE_APPLICATION_ERROR(-20400, 'Invalid skill (code A-Z/0-9/_/-, English name required)');
+    END IF;
+    IF l_id IS NULL THEN
+      INSERT INTO lms_skills (skill_code, name_en, name_ar, skill_group, active_flag)
+      VALUES (l_code, p_name_en, p_name_ar, SUBSTR(p_skill_group, 1, 100), p_active_flag) RETURNING skill_id INTO l_id;
+    ELSE
+      UPDATE lms_skills SET skill_code = l_code, name_en = p_name_en, name_ar = p_name_ar,
+             skill_group = SUBSTR(p_skill_group, 1, 100), active_flag = p_active_flag WHERE skill_id = l_id;
+      IF SQL%ROWCOUNT = 0 THEN RAISE_APPLICATION_ERROR(-20404, 'Skill not found'); END IF;
+    END IF;
+    lms_audit_pkg.log_event('SKILL_SAVE', 'SKILL', l_id);
+    RETURN l_id;
+  EXCEPTION WHEN DUP_VAL_ON_INDEX THEN
+    RAISE_APPLICATION_ERROR(-20409, 'A skill with this code already exists');
+  END save_skill;
+
+  PROCEDURE remove_skill(p_skill_id IN NUMBER) IS
+    l_n NUMBER;
+  BEGIN
+    lms_security_pkg.require_permission('SKILL_MANAGE');
+    SELECT (SELECT COUNT(*) FROM lms_position_skills WHERE skill_id = p_skill_id)
+         + (SELECT COUNT(*) FROM lms_user_skills WHERE skill_id = p_skill_id)
+         + (SELECT COUNT(*) FROM lms_course_skills WHERE skill_id = p_skill_id) INTO l_n FROM dual;
+    IF l_n > 0 THEN RAISE_APPLICATION_ERROR(-20409, 'The skill is in use. Deactivate it instead of deleting it.'); END IF;
+    DELETE FROM lms_skills WHERE skill_id = p_skill_id;
+    IF SQL%ROWCOUNT = 0 THEN RAISE_APPLICATION_ERROR(-20404, 'Skill not found'); END IF;
+    lms_audit_pkg.log_event('SKILL_REMOVE', 'SKILL', p_skill_id);
+  END remove_skill;
+
+  -- Validates that the skill is active and the other side exists, with readable errors instead of FK failures.
+  PROCEDURE assert_skill_active(p_skill_id IN NUMBER) IS
+    l_flag lms_skills.active_flag%TYPE;
+  BEGIN
+    BEGIN SELECT active_flag INTO l_flag FROM lms_skills WHERE skill_id = p_skill_id;
+    EXCEPTION WHEN NO_DATA_FOUND THEN RAISE_APPLICATION_ERROR(-20404, 'Skill not found'); END;
+    IF l_flag <> 'Y' THEN RAISE_APPLICATION_ERROR(-20409, 'The skill is inactive'); END IF;
+  END assert_skill_active;
+
+  PROCEDURE set_position_skill(p_position_id IN NUMBER, p_skill_id IN NUMBER, p_required_level IN NUMBER) IS
+    l_n NUMBER;
+  BEGIN
+    lms_security_pkg.require_permission('SKILL_MANAGE');
+    SELECT COUNT(*) INTO l_n FROM lms_positions WHERE position_id = p_position_id;
+    IF l_n = 0 THEN RAISE_APPLICATION_ERROR(-20404, 'Position not found'); END IF;
+    IF p_required_level IS NULL THEN
+      DELETE FROM lms_position_skills WHERE position_id = p_position_id AND skill_id = p_skill_id;
+    ELSE
+      IF p_required_level <> TRUNC(p_required_level) OR p_required_level NOT BETWEEN 1 AND 5 THEN
+        RAISE_APPLICATION_ERROR(-20400, 'Required level must be a whole number from 1 to 5');
+      END IF;
+      assert_skill_active(p_skill_id);
+      MERGE INTO lms_position_skills t
+      USING (SELECT p_position_id position_id, p_skill_id skill_id FROM dual) s
+         ON (t.position_id = s.position_id AND t.skill_id = s.skill_id)
+       WHEN MATCHED THEN UPDATE SET t.required_level = p_required_level
+       WHEN NOT MATCHED THEN INSERT (position_id, skill_id, required_level) VALUES (s.position_id, s.skill_id, p_required_level);
+    END IF;
+    lms_audit_pkg.log_event('POSITION_SKILL', 'POSITION', p_position_id, 'SUCCESS',
+                            lms_util_pkg.js('skill', p_skill_id, 'level', NVL(TO_CHAR(p_required_level), 'REMOVED')));
+  END set_position_skill;
+
+  PROCEDURE set_course_skill(p_course_id IN NUMBER, p_skill_id IN NUMBER, p_level_gained IN NUMBER) IS
+  BEGIN
+    IF NOT (lms_security_pkg.has_permission('SKILL_MANAGE') OR lms_course_pkg.can_manage_course(p_course_id, 'COURSE_AUTHOR')) THEN
+      lms_audit_pkg.log_event('ACCESS_DENIED', 'COURSE_SKILL', p_course_id, 'DENIED');
+      RAISE_APPLICATION_ERROR(-20403, 'Not authorized');
+    END IF;
+    IF p_level_gained IS NULL THEN
+      DELETE FROM lms_course_skills WHERE course_id = p_course_id AND skill_id = p_skill_id;
+    ELSE
+      IF p_level_gained <> TRUNC(p_level_gained) OR p_level_gained NOT BETWEEN 1 AND 5 THEN
+        RAISE_APPLICATION_ERROR(-20400, 'Level gained must be a whole number from 1 to 5');
+      END IF;
+      assert_skill_active(p_skill_id);
+      MERGE INTO lms_course_skills t
+      USING (SELECT p_course_id course_id, p_skill_id skill_id FROM dual) s
+         ON (t.course_id = s.course_id AND t.skill_id = s.skill_id)
+       WHEN MATCHED THEN UPDATE SET t.level_gained = p_level_gained
+       WHEN NOT MATCHED THEN INSERT (course_id, skill_id, level_gained) VALUES (s.course_id, s.skill_id, p_level_gained);
+    END IF;
+    lms_audit_pkg.log_event('COURSE_SKILL', 'COURSE', p_course_id, 'SUCCESS',
+                            lms_util_pkg.js('skill', p_skill_id, 'level', NVL(TO_CHAR(p_level_gained), 'REMOVED')));
+  END set_course_skill;
+
+  FUNCTION copy_position_skills(p_from_position IN NUMBER, p_to_position IN NUMBER) RETURN NUMBER IS
+    l_rows NUMBER;
+  BEGIN
+    lms_security_pkg.require_permission('SKILL_MANAGE');
+    IF p_from_position = p_to_position THEN RAISE_APPLICATION_ERROR(-20400, 'Choose two different positions'); END IF;
+    INSERT INTO lms_position_skills (position_id, skill_id, required_level)
+    SELECT p_to_position, ps.skill_id, ps.required_level
+      FROM lms_position_skills ps JOIN lms_skills sk ON sk.skill_id = ps.skill_id AND sk.active_flag = 'Y'
+     WHERE ps.position_id = p_from_position
+       AND NOT EXISTS (SELECT 1 FROM lms_position_skills x WHERE x.position_id = p_to_position AND x.skill_id = ps.skill_id);
+    l_rows := SQL%ROWCOUNT;
+    lms_audit_pkg.log_event('POSITION_SKILL_COPY', 'POSITION', p_to_position, 'SUCCESS', lms_util_pkg.js('from', p_from_position, 'added', l_rows));
+    RETURN l_rows;
+  END copy_position_skills;
 END lms_skill_pkg;
 /
 

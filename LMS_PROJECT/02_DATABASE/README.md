@@ -22,10 +22,10 @@ member has a body; the validation script's table list equals the DDL. **Not run:
 | `12_rollback.sql` | Drops every LMS object in the current schema (`@12_rollback.sql YES`); destructive |
 | `13_apex_glue.sql` | `LMS_SECRET_PKG` (stub), `LMS_APEX_PKG` (authorization functions, post-auth, error handler, Ajax callbacks, signed content URLs, lesson renderer, file streaming), `LMS_ADMIN_PKG` (audited admin writes) |
 | `14_ords_pkg.sql` | `LMS_ORDS_PKG` (handler logic for verification, catalog, HR sync, health) + `HR_SYNC` policy, `API_LOG_ENABLED`, `CONTENT_BASE_URL` settings |
-| `15_views_apex.sql` | 45 views behind the APEX pages: learner, approvals, authoring, administration, monitoring, analytics |
-| `16_views_lov.sql` | 15 lookup/detail/maintenance views (LOVs, course outline, prerequisites, instructors, popularity, admin lists) |
+| `15_views_apex.sql` | 46 views behind the APEX pages: learner, approvals, authoring, administration, monitoring, analytics |
+| `16_views_lov.sql` | 30 lookup, detail, maintenance, skills and feedback views (LOVs, course outline, prerequisites, instructors, popularity, admin lists, anonymised feedback analytics) |
 
-Counts: 56 tables, 76 views, 22 packages (147 public members), 7 scheduler jobs, 10 rate-limit policies, 23 bilingual notification templates.
+Counts: 56 tables, 91 views, 22 packages (158 public members), 7 scheduler jobs, 10 rate-limit policies, 23 bilingual notification templates.
 
 ## Prerequisites
 - Schema owner privileges: `CREATE SESSION/TABLE/VIEW/SEQUENCE/PROCEDURE/JOB`, tablespace quota; **no DBA role**.
@@ -49,3 +49,15 @@ Counts: 56 tables, 76 views, 22 packages (147 public members), 7 scheduler jobs,
 
 ## Not covered by these scripts
 APEX page/process definitions, ORDS modules, WAF rules, PDF layout for certificates, scheduler-job credentials, wallets. Authoring screens that edit modules/lessons through Interactive Grids need either the package procedures (`add_module`, `add_lesson`) behind custom processes or DML processes that call `LMS_COURSE_PKG.CAN_MANAGE_COURSE` first; there is no `update_lesson/reorder` API yet.
+
+## Skills and feedback procedures (latest addition)
+| Package | Procedure | Permission | Notes |
+|---|---|---|---|
+| `LMS_SKILL_PKG` | `save_skill`, `remove_skill` | `SKILL_MANAGE` | code upper-cased, unique; delete only when unused |
+| | `set_position_skill`, `copy_position_skills` | `SKILL_MANAGE` | levels 1–5, NULL removes; copy never overwrites |
+| | `set_course_skill` | `SKILL_MANAGE` or course author | completion later credits the level |
+| `LMS_FEEDBACK_PKG` | `save_form`, `clone_form`, `save_form_question`, `remove_form_question` | `COURSE_PUBLISH` | answered questions are immutable (order only) |
+| | `assign_form` | `COURSE_PUBLISH` or course author | refused once responses exist with another form |
+| | `update_review` | review owner | window = setting `REVIEW_EDIT_DAYS` (default 0 = final) |
+Settings added: `FEEDBACK_MIN_RESPONSES` (5; instructors see aggregates/comments only above this), `REVIEW_EDIT_DAYS` (0).
+Tests: `06_TESTING/UNIT_TESTS/skills_feedback_tests.sql` (impersonates `TD_*` users through APEX sessions; rolls back).

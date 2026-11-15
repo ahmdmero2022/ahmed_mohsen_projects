@@ -9,7 +9,7 @@ authorised in `LMS_COURSE_PKG` / `LMS_ASSESSMENT_PKG` / `LMS_SESSION_PKG` (instr
 > `case when :LMS_LANG = 'ar' and X_ar is not null then X_ar else X_en end` over the view's `X_en` / `X_ar` columns. Write it out in the region SQL
 > (or as a Cards/IR *computed column*); there is deliberately no PL/SQL function for it, to avoid a context switch per row.
 
-**Navigation**: Dashboard (1) · My courses (10) · Question bank (20) · Grading (30) · Sessions (40) · Learner progress (50).
+**Navigation**: Dashboard (1) · My courses (10) · Question bank (20) · Grading (30) · Sessions (40) · Learner progress (50) · Feedback (51).
 
 | Pg | Name | Type |
 |---|---|---|
@@ -21,6 +21,7 @@ authorised in `LMS_COURSE_PKG` / `LMS_ASSESSMENT_PKG` / `LMS_SESSION_PKG` (instr
 | 30 / 31 | Grading queue / Grade attempt (modal) | IR / Modal |
 | 40 / 41 / 42 | Sessions calendar / Session form (modal) / Attendance (modal) | Calendar / Form / IG |
 | 50 | Learner progress | IR |
+| 51 | Course feedback | Report + charts |
 
 ## Page 1 — Instructor dashboard
 | Static ID | Source |
@@ -100,6 +101,9 @@ Validation `V_FILE_SCAN` runs **before** the process: call the organisation's ma
 ### Page 15 — Step 5: Completion rules
 Form: `P15_COMPLETION_RULE` (Radio Group `LOV_COMPLETION_RULE` with help text), `P15_CERT_ELIGIBLE` (Switch), `P15_CERT_TEMPLATE` (Select List `v_lms_lov_templates`; process `lms_course_pkg.set_certificate_template(:P15_COURSE_ID, :P15_CERT_TEMPLATE)`), `P15_PASS_REQUIRED`. Live **validation panel** (`R_CHECKS`, Classic Report) showing `lms_course_pkg.validate_publishable(:P15_COURSE_ID)` result; disabled *Next* while it returns text.
 Process: `lms_course_pkg.update_course(...)` as on page 11 with the new rule.
+Two more regions on this step:
+- `R_SKILLS` — *Skills this course builds*: IG on `v_lms_course_skills_edit` (skill select from `v_lms_lov_skills`, level gained 1–5). Save per row: `C/U` → `lms_skill_pkg.set_course_skill(:P15_COURSE_ID, :SKILL_ID, :LEVEL_GAINED);` `D` → same call with `null`. Course authors may tag their own courses; HR may tag any. Completing the course raises each learner's level for these skills (never lowers it).
+- `R_FEEDBACK_FORM` — `P15_FEEDBACK_FORM` Select List (`v_lms_lov_feedback_forms`; empty = no questionnaire); process `lms_feedback_pkg.assign_form(:P15_COURSE_ID, :P15_FEEDBACK_FORM);` (refused once feedback was collected with a different form).
 
 ### Page 16 — Step 6: Review and publish
 Read-only summary (counts: modules, lessons, required lessons, quizzes, duration; `validate_publishable` result), button `B_SUBMIT` (condition: status = DRAFT and no validation message) → confirm → `lms_course_pkg.submit_for_review(:P16_COURSE_ID);`. After submit, the course shows *Under review*; the author **cannot approve** (SoD in `lms_approval_pkg.decide`). A rejection returns it to DRAFT with the reviewer note by notification.
@@ -120,6 +124,13 @@ Learner answers are rendered escaped (stored as typed).
 
 ## Page 50 — Learner progress
 IR on `v_lms_course_learners` (course selector `P50_COURSE_ID` from `v_lms_my_courses`): learner, department, status, progress %, last activity, best score, time spent. Download CSV allowed (row scope already enforced by the view; downloads audited via a *Before Download* process `lms_audit_pkg.log_event('EXPORT','REPORT',null,'SUCCESS',lms_util_pkg.js('report','course_learners'))`). Button *Approve completion* (only for courses with rule `INSTRUCTOR_APPROVAL`, row status IN_PROGRESS and all lessons done) → `lms_progress_pkg.approve_completion(:ENROLLMENT_ID)`.
+
+## Page 51 — Course feedback (anonymous aggregates)
+Authorization `LMS_AUTH_INSTRUCTOR`; item `P51_COURSE_ID` (select from `v_lms_my_courses`). **Nothing is shown until the number of responses reaches `FEEDBACK_MIN_RESPONSES` (default 5)**, so individuals cannot be identified; below the threshold the page says "Not enough responses yet".
+- `R_RATINGS` Chart (bar): `select question_en, avg_rating, responses from v_lms_course_feedback_summary where course_id=:P51_COURSE_ID order by sort_order` (with data-table alternative).
+- `R_REVIEWS_SUM` KPI tiles: `select reviews, avg_course_rating, avg_instructor_rating from v_lms_course_review_summary where course_id=:P51_COURSE_ID`.
+- `R_COMMENTS` Classic Report: `select comment_month, source, comment_text from v_lms_course_feedback_comments where course_id=:P51_COURSE_ID order by comment_month desc` — no names, no enrolment ids, month granularity only; text escaped; downloads disabled.
+- Moderation of abusive reviews is a training-admin action (app 220 page 14).
 
 ---
 ## Remaining items for this app

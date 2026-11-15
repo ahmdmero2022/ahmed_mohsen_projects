@@ -54,7 +54,7 @@ BEGIN
   chk(l_n = 4, 'idempotency unique indexes (certificates, open attempt, open approval)');
 
   SELECT COUNT(*) INTO l_n FROM user_views WHERE view_name LIKE 'V\_LMS\_%' ESCAPE '\' OR view_name = 'LMS_COURSE_RATING_V';
-  chk(l_n >= 75, 'views present (' || l_n || ')');
+  chk(l_n >= 91, 'views present (' || l_n || ')');
 
   -- 5. answer keys must not be exposed by learner-facing views
   SELECT COUNT(*) INTO l_n FROM user_tab_columns

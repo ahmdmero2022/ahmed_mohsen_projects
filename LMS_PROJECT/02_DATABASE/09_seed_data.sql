@@ -114,7 +114,9 @@ USING (SELECT 'RETAIN_AUDIT_DAYS' k, '2555' v, 'Audit log retention (days)' d FR
        SELECT 'REVIEW_REQUIRES_COMPLETION', 'Y', 'Y = reviews only after completion' FROM dual UNION ALL
        SELECT 'DEFAULT_CERT_TEMPLATE', 'DEFAULT', 'Template code used when a course has none' FROM dual UNION ALL
        SELECT 'MAIL_FROM', 'lms-noreply@example.invalid', 'Sender address (set per environment)' FROM dual UNION ALL
-       SELECT 'APEX_WORKSPACE', 'LMS', 'APEX workspace name used by APEX_MAIL from jobs (set per environment)' FROM dual) s
+       SELECT 'APEX_WORKSPACE', 'LMS', 'APEX workspace name used by APEX_MAIL from jobs (set per environment)' FROM dual UNION ALL
+       SELECT 'FEEDBACK_MIN_RESPONSES', '5', 'Minimum responses before course feedback is shown to instructors (anonymity)' FROM dual UNION ALL
+       SELECT 'REVIEW_EDIT_DAYS', '0', 'Days a learner may edit a review (0 = reviews are final)' FROM dual) s
    ON (t.setting_key = s.k)
  WHEN NOT MATCHED THEN INSERT (setting_key, setting_value, description) VALUES (s.k, s.v, s.d);
 

@@ -10,7 +10,7 @@ Every list reads a `V_LMS_*` view that **itself checks the permission** (a mis-a
 > `case when :LMS_LANG = 'ar' and X_ar is not null then X_ar else X_en end` over the view's `X_en` / `X_ar` columns. Write it out in the region SQL
 > (or as a Cards/IR *computed column*); there is deliberately no PL/SQL function for it, to avoid a context switch per row.
 
-**Navigation (training admin)**: Dashboard (1) · Courses (10) · Approvals (12) · Enrolments (20) · Assignments (25) · Sessions (30) · Certificates (40) · Categories (50).
+**Navigation (training admin)**: Dashboard (1) · Courses (10) · Approvals (12) · Reviews (14) · Feedback forms (15) · Enrolments (20) · Assignments (25) · Sessions (30) · Certificates (40) · Categories (50).
 **Navigation (system admin)**: Settings (60) · Notification templates (61) · Users (70) · Roles & permissions (73) · Audit (80) · Security events (81) · Integration logs (82) · Rate limits (90) · Monitoring (95).
 
 | Pg | Name | Scheme | Pg | Name | Scheme |
@@ -23,6 +23,7 @@ Every list reads a `V_LMS_*` view that **itself checks the permission** (a mis-a
 | 30 | Training schedule (sessions) | SESSION_MANAGE | 82 | Integration logs | AUDIT |
 | 40 / 41 / 42 | Certificates / Revoke dialog / Templates | CERT_POLICY | 90 | Rate-limit policies | RATELIMIT |
 | 50 | Categories | TRAINING_ADMIN | 95 | Monitoring dashboard | AUDIT |
+| 14 / 15 | Reviews moderation / Feedback forms & questions | TRAINING_ADMIN | | | |
 | 60 | System settings | SETTINGS | | | |
 
 ## Page 1 — Admin dashboard
@@ -35,6 +36,10 @@ Every list reads a `V_LMS_*` view that **itself checks the permission** (a mis-a
 
 ## Page 12 — Approvals inbox
 IR on `v_lms_approvals_inbox` (course publication + enrolments the caller may decide; never their own requests). Columns: type, item, requester, requested, due, overdue (text), escalations. Row button → **dialog 13** (`P13_APPROVAL_ID` protected) with note textarea and buttons *Approve* / *Reject* (reject requires a note — validation): `lms_approval_pkg.decide(:P13_APPROVAL_ID, 'APPROVE'|'REJECT', :P13_NOTE);`. For course publication show a *Review* link that opens the course read-only (app 210 page 16). Approving a course creates a version snapshot and publishes it; rejecting returns it to DRAFT with the note.
+
+## Pages 14/15 — Reviews moderation and feedback forms
+**14** (Reviews): IR on `v_lms_reviews_moderation` (all reviews incl. hidden: course, rating, text, status; `COURSE_PUBLISH` ALL only). Row action *Hide/Show* → `lms_feedback_pkg.set_review_visibility(:REVIEW_ID, :SHOW = 'Y')`; audited.
+**15** (Feedback forms): master-detail. Master IG on `v_lms_feedback_forms_admin` (name EN/AR, active; read-only `questions`, `courses_using`, `responses`): save `:FORM_ID := lms_feedback_pkg.save_form(:FORM_ID, :NAME_EN, :NAME_AR, :ACTIVE_FLAG);` (deactivation refused while published courses use the form); row button *Clone* → `lms_feedback_pkg.clone_form(:FORM_ID)` (the way to change a form that already has responses). Detail IG on `v_lms_feedback_questions_admin` for the selected form (text EN/AR, answer type RATING/TEXT, order; read-only `responses`): save `:QUESTION_ID := lms_feedback_pkg.save_form_question(:QUESTION_ID, :P15_FORM_ID, :TEXT_EN, :TEXT_AR, :ANSWER_TYPE, :SORT_ORDER);` delete → `lms_feedback_pkg.remove_form_question(:QUESTION_ID);`. Questions that already have responses are locked except for their order. Attaching a form to a course: app 210 page 15 (authors) or `lms_feedback_pkg.assign_form` by training admins.
 
 ## Pages 20/21 — Enrolment management
 **20**: IR on `v_lms_team_enrollments` (scope ALL for admins): user, department, course, status, type, due, progress, overdue. Facets: status, type, department (`v_lms_lov_departments`), overdue. Row actions: *Cancel* (`lms_enrollment_pkg.cancel`, confirm), *Promote waitlist* for the course (`lms_enrollment_pkg.promote_waitlist`). Download CSV/Excel enabled (Before Download process audits `EXPORT`; the view already limits rows).

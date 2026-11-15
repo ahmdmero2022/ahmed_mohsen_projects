@@ -10,7 +10,7 @@ language: title expression `case when :LMS_LANG='ar' and title_ar is not null th
 > (or as a Cards/IR *computed column*); there is deliberately no PL/SQL function for it, to avoid a context switch per row.
 
 **Navigation menu (list `LMS_NAV_PORTAL`)**: Dashboard (1) · Catalog (10) · My Learning (30) · Learning Paths (50) ·
-Sessions (55) · Certificates (60) · Notifications (80, via navigation bar) · Preferences (70, via user menu).
+Sessions (55) · My skills (56) · Certificates (60) · Notifications (80, via navigation bar) · Preferences (70, via user menu).
 
 | Pg | Name | Type | Pg | Name | Type |
 |---|---|---|---|---|---|
@@ -19,6 +19,7 @@ Sessions (55) · Certificates (60) · Notifications (80, via navigation bar) · 
 | 10 | Course catalog | Cards + Faceted Search | 61 | Certificate print | Blank (print) |
 | 11 | Course details | Blank | 70 | Preferences | Form |
 | 12 | Enroll (confirm) | Modal dialog | 80 | Notifications | Interactive Report |
+| 13 | Course feedback | Modal dialog | 56 | My skills | Blank |
 | 20 | Learning player | Blank (Player template) | 90 | Verify a certificate | Public |
 | 21 | Lesson file stream | Process-only page | | | |
 | 30 | My learning | Cards + pill tabs | 9998 | Access error / session expired | Public |
@@ -47,6 +48,7 @@ Purpose: FR-RPT-01 (learner KPIs), continue learning. PAP: Unrestricted-not-need
 | `R_SESSIONS` | Classic Report | `select title_l10n, start_ts, venue_en, status from v_lms_my_sessions where start_ts > systimestamp order by start_ts fetch first 5 rows only` | Lazy |
 | `R_RECOMMENDED` | Cards | `select course_id, title_l10n title, duration_minutes, difficulty, thumbnail_ref from v_lms_my_recommended order by coverage desc fetch first 4 rows only` | Lazy; hidden when no rows (Server-side condition *Rows returned*) |
 | `R_CERTS` | Cards | `select certificate_id, title_l10n title, issued_at, expires_at, status from v_lms_my_certs order by issued_at desc fetch first 3 rows only` | Lazy; link → 60 |
+| `R_FEEDBACK_TODO` | Classic Report (condition: rows exist) | `select enrollment_id, title_l10n, completed_at, reviewed_flag, form_questions, answered from v_lms_my_feedback_todo order by completed_at desc fetch first 3 rows only` | Lazy; button *Give feedback* → page 13 (`P13_ENROLLMENT_ID`, checksum); appears only after completion |
 | `R_ACHIEVEMENTS` | Classic Report | `select title_l10n, completed_at from v_lms_my_enrollments where status='COMPLETED' order by completed_at desc fetch first 5 rows only` | Lazy ("recent achievements") |
 
 Performance: 8 small queries; the 5 lazy regions load after first paint. All hit `LMS_ENR_USER_STATUS_IX` (user + status). Expected 3–6 ms DB time each.
@@ -102,6 +104,7 @@ select case when c.my_status is not null then 'N'
 | `R_OBJECTIVES` | Static Content | `objectives_l10n` (one objective per line → list) |
 | `R_CURRICULUM` | Classic Report with *Control Break* on module | `select module_order, module_title_l10n, lesson_order, lesson_title_l10n, lesson_type, duration_minutes from v_lms_course_outline where course_id=:P11_COURSE_ID order by module_order, lesson_order` (titles only; lesson content never exposed before enrolment) |
 | `R_PREREQ` | Classic Report | `select title_l10n, met_flag from v_lms_course_prereqs where course_id=:P11_COURSE_ID` — met shows ✓ + "Completed", unmet shows ✗ + "Required"; text, not colour only |
+| `R_REVIEWS` | Classic Report (lazy) | `select reviewer, course_rating, instructor_rating, review_text, review_date from v_lms_course_reviews_public where course_id=:P11_COURSE_ID order by review_date desc fetch first 10 rows only` — initials only; text escaped; hidden reviews never appear |
 | `R_INSTRUCTORS` | Cards (small) | `select full_name_l10n, position_l10n, instructor_role from v_lms_course_instructors where course_id=:P11_COURSE_ID` |
 | `R_REQUIREMENTS` | Static | completion rule text from `LMS_RULE_*` message + certificate flag |
 Perf: 5 indexed queries by `course_id`. Cache: none (user-specific `met_flag`).
@@ -115,6 +118,14 @@ Template: Modal Dialog (Title: "Confirm enrolment"). Items: `P12_COURSE_ID` (hid
   Errors (prerequisites, deadline, rate limit) flow through the application error handler into an inline notification.
 - **Dialog Closed** DA on page 11: refresh banner (`R_BANNER`) and redirect to 30 when status is ENROLLED.
 - Validation: none client-side beyond the process (package is the authority). Idempotent: double-click returns the same enrolment.
+
+## Page 13 — Course feedback (modal)
+Template: Modal Dialog. Items: `P13_ENROLLMENT_ID` (hidden, Value Protected = Yes), `P13_REVIEW_ID` (hidden). Authorization `LMS_AUTH_LEARNER`; the packages re-check that the enrolment is the caller's and (policy `REVIEW_REQUIRES_COMPLETION`) completed.
+- `R_REVIEW`: `P13_COURSE_RATING` (Star Rating 1–5, required), `P13_INSTRUCTOR_RATING` (Star Rating, optional), `P13_REVIEW_TEXT` (Textarea, 2,000, plain text). If a review exists (`select review_id, course_rating, instructor_rating, review_text, editable_flag from v_lms_my_reviews where enrollment_id = :P13_ENROLLMENT_ID`) fields load read-only unless `editable_flag = 'Y'` (policy `REVIEW_EDIT_DAYS`).
+- `R_FORM` (only when the course has a questionnaire): Classic Report with `apex_item` inputs from `select question_id, text_l10n, answer_type, rating, comment_text from v_lms_my_feedback_form where enrollment_id = :P13_ENROLLMENT_ID order by sort_order` — RATING → `apex_item.radiogroup` 1–5, TEXT → `apex_item.textarea` (2,000). Rows already answered are read-only (answers are final).
+- Processes (on `B_SUBMIT`, in this order): `PR_REVIEW`: `if :P13_REVIEW_ID is null then lms_feedback_pkg.submit_review(:P13_ENROLLMENT_ID, :P13_COURSE_RATING, :P13_INSTRUCTOR_RATING, :P13_REVIEW_TEXT); else lms_feedback_pkg.update_review(:P13_REVIEW_ID, :P13_COURSE_RATING, :P13_INSTRUCTOR_RATING, :P13_REVIEW_TEXT); end if;`
+  `PR_ANSWERS`: loop over the unanswered rows (`apex_application.g_f01` = question ids, `g_f02` = ratings, `g_f03` = comments) → `lms_feedback_pkg.submit_answer(:P13_ENROLLMENT_ID, <question_id>, <rating>, <comment>);`
+- Duplicate/unauthorised feedback is prevented in the database: one review per enrolment (unique key), one answer per question (unique key), ownership and completion checked in the package. A double submit cannot double count.
 
 ## Page 20 — Learning player
 Template: **Player** (full width, no side nav). Authorization `LMS_AUTH_ENROLLED` (page) + `LMS_AUTH_LEARNER`. PAP: *Arguments Must Have Checksum*;
@@ -196,6 +207,9 @@ Path certificate shown in `R_CERT` when `status='COMPLETED'` (link to 60). "Reco
 
 ## Page 55 — Instructor-led sessions
 `R_CAL` Calendar (Display Column `start_ts`, End `end_ts`, title `title_l10n`; Source `v_lms_session_catalog`); `R_UPCOMING` Classic Report same source with `seats_left`, `my_status`, button *Register* (when `my_status is null and seats_left > 0`), *Join waiting list* (when no seats), *Unregister* (when registered). Processes: `PR_REGISTER` → `lms_session_pkg.register(:P55_SESSION_ID, :P55_STATUS);` `PR_UNREGISTER` → `lms_session_pkg.cancel_registration(:P55_SESSION_ENROLLMENT_ID);` (ownership checked inside). `R_MINE` report from `v_lms_my_sessions` (meeting link only when REGISTERED). Calendar timezone: display in the user's browser zone; stored `TIMESTAMP WITH TIME ZONE`.
+
+## Page 56 — My skills
+Authorization `LMS_AUTH_LEARNER`. `R_SKILLS` Classic Report on `v_lms_my_skills` (skill, current level, level required by my position, gap; text such as "2 of 4" plus a level bar). `R_NEXT` Cards on `v_lms_my_recommended` ("Courses that close your gaps") → page 11. Levels rise automatically when a course tagged with the skill is completed (`lms_progress_pkg`) and when a manager/HR records an assessment (app 230 page 41). Empty state: "No skills are defined for your position yet."
 
 ## Pages 60/61 — Certificates
 **60**: `R_CERTS` Cards from `v_lms_my_certs` (title, issued, expires, verification code, status text); buttons *Download* → page 61 (`P61_CERTIFICATE_ID`, checksum), *Copy verification link* (JS, builds `…/90?P90_CODE=`). Empty state `LMS_NO_CERTS`.

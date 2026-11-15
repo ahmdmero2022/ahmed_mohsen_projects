@@ -14,7 +14,7 @@ and a row limit of 10,000 (Report Attributes → Maximum Rows).
 # App 230 — LMS Management (department managers, HR)
 
 Default scheme `LMS_AUTH_MANAGER` (HR users also pass `LMS_AUTH_HR` / `LMS_AUTH_REPORT_ORG`, which switches the views to organisation scope).
-**Navigation**: Dashboard (1) · Team learning (10) · Approvals (20) · Assign training (30) · Skill gaps (40).
+**Navigation**: Dashboard (1) · Team learning (10) · Approvals (20) · Assign training (30) · Skill gaps (40) · *Skills framework* (42–44, HR only, condition `LMS_AUTH_HR`).
 
 ## Page 1 — Manager dashboard
 | Static ID | Source |
@@ -37,7 +37,12 @@ IR on `v_lms_team_enrollments` (employee, department, course, status, type, due,
 `P30_USER_ID` (Popup LOV `v_lms_lov_users` — only visible/active people), `P30_COURSE_ID` (select from `v_lms_catalog` published courses), `P30_DUE_DATE`, `P30_MANDATORY` (switch → type `MANDATORY`, else `MANAGER`). Process: `lms_enrollment_pkg.assign(:P30_USER_ID, :P30_COURSE_ID, :P30_DUE_DATE, case when :P30_MANDATORY='Y' then 'MANDATORY' else 'MANAGER' end, :P30_ENR_ID, :P30_STATUS);` Errors: outside scope → "not authorized" (audited `ACCESS_DENIED`), prerequisites, closed course. A manager can assign **individuals**; group assignments are admin-only (`create_assignment` requires ALL scope).
 
 ## Pages 40/41 — Skill gaps
-**40**: IR on `v_lms_skill_gaps` (employee, department, skill, required, current, gap) + side region *Recommended courses*: `select title_en, full_name_en, coverage from v_lms_team_recommended where user_id = :P40_USER_ID order by coverage desc fetch first 10 rows only` (employee picked from the IR row). **41** (dialog): HR/manager records an assessment: `P41_USER_ID` (protected), `P41_SKILL_ID` (`v_lms_lov_skills`), `P41_LEVEL` (0–5) → `lms_skill_pkg.assess_skill(:P41_USER_ID, :P41_SKILL_ID, :P41_LEVEL);` (allowed for `SKILL_MANAGE` holders and for managers on their own team; audited). Skill levels also rise automatically when a learner completes a course tagged with that skill. Skills catalogue/position-requirement maintenance (HR) is **not** built: no package procedures exist for `LMS_SKILLS`, `LMS_POSITION_SKILLS`, `LMS_COURSE_SKILLS` (outstanding work, doc 08).
+**40**: IR on `v_lms_skill_gaps` (employee, department, skill, required, current, gap) + side region *Recommended courses*: `select title_en, full_name_en, coverage from v_lms_team_recommended where user_id = :P40_USER_ID order by coverage desc fetch first 10 rows only` (employee picked from the IR row). **41** (dialog): HR/manager records an assessment: `P41_USER_ID` (protected), `P41_SKILL_ID` (`v_lms_lov_skills`), `P41_LEVEL` (0–5) → `lms_skill_pkg.assess_skill(:P41_USER_ID, :P41_SKILL_ID, :P41_LEVEL);` (allowed for `SKILL_MANAGE` holders and for managers on their own team; audited). Skill levels also rise automatically when a learner completes a course tagged with that skill. 
+## Pages 42/43/44 — Skills framework (HR, scheme `LMS_AUTH_HR`)
+**42 Skills catalogue**: IG on `v_lms_skills_admin` (code, names EN/AR, group, active; read-only `positions_using`, `courses_using`, `people_assessed`). Save: `:SKILL_ID := lms_skill_pkg.save_skill(:SKILL_ID, :SKILL_CODE, :NAME_EN, :NAME_AR, :SKILL_GROUP, :ACTIVE_FLAG);` Delete (offered only when all three counts are 0): `lms_skill_pkg.remove_skill(:SKILL_ID)`; otherwise deactivate. Duplicate codes → "already exists".
+**43 Position requirements**: master select `P43_POSITION_ID` (`v_lms_lov_positions`); IG on `v_lms_position_skills_admin` filtered by position (skill select from `v_lms_lov_skills`, required level 1–5). Save per row: `lms_skill_pkg.set_position_skill(:P43_POSITION_ID, :SKILL_ID, :REQUIRED_LEVEL);` delete row → same call with `null`. Button *Copy from position…* (dialog: source position) → `:P43_ADDED := lms_skill_pkg.copy_position_skills(:P43_FROM, :P43_POSITION_ID);` shows "n requirements added" (never overwrites). Effects are immediate in the gap views and dashboards.
+**44 Course skills**: IG on `v_lms_course_skills_edit` with a course selector → `lms_skill_pkg.set_course_skill(:COURSE_ID, :SKILL_ID, :LEVEL_GAINED)` (null removes). The same grid is embedded in the instructor course builder (scoped to the author's courses).
+Every change is audited (`SKILL_SAVE`, `POSITION_SKILL`, `COURSE_SKILL`, …). Grouping above skills is only the text column `skill_group`; a separate competency-framework table is not modelled.
 
 ---
 # App 240 — LMS Analytics (executives, HR, training admins)
