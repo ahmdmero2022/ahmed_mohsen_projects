@@ -219,3 +219,14 @@ CREATE OR REPLACE VIEW v_lms_reviews_moderation AS
 SELECT r.review_id, r.course_id, c.title_en AS course_en, r.course_rating, r.instructor_rating, r.review_text, r.status, r.created_at
   FROM lms_course_reviews r JOIN lms_courses c ON c.course_id = r.course_id
  WHERE (SELECT lms_security_pkg.permission_scope('COURSE_PUBLISH') FROM dual) = 'ALL';
+
+-- venue maintenance list with usage (training administrators)
+CREATE OR REPLACE VIEW v_lms_venues_admin AS
+SELECT v.venue_id, v.name_en, v.name_ar, v.address, v.capacity, v.active_flag,
+       (SELECT COUNT(*) FROM lms_training_sessions s WHERE s.venue_id = v.venue_id) AS sessions_total,
+       (SELECT COUNT(*) FROM lms_training_sessions s WHERE s.venue_id = v.venue_id AND s.status IN ('SCHEDULED','PUBLISHED')
+           AND s.end_ts > SYSTIMESTAMP) AS sessions_upcoming,
+       (SELECT MAX(s.seats) FROM lms_training_sessions s WHERE s.venue_id = v.venue_id AND s.status IN ('SCHEDULED','PUBLISHED')
+           AND s.end_ts > SYSTIMESTAMP) AS max_upcoming_seats
+  FROM lms_venues v
+ WHERE (SELECT lms_security_pkg.permission_scope('SESSION_MANAGE') FROM dual) = 'ALL';

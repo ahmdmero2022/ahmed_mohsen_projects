@@ -16,7 +16,7 @@ definitions, regions, dynamic actions and processes are *build instructions*, no
 | `STATIC_FILES/assessment.js` | Server-clock-based timer, autosave, time-up submit; syntax-checked only |
 
 ## How the pages stay thin and safe
-- Pages read **only** `V_LMS_*` views (91 views; each view that exposes more than the caller's own data checks the permission itself).
+- Pages read **only** `V_LMS_*` views (92 views; each view that exposes more than the caller's own data checks the permission itself).
 - Pages write **only** by calling `LMS_*_PKG` procedures (one-line processes). No page DML on tables, no business rules in pages.
 - Database objects that back the pages: `02_DATABASE/13_apex_glue.sql` (authorization functions, post-auth, error handler, Ajax callbacks,
   signed content URLs, lesson renderer, file streaming, audited admin writes), `15_views_apex.sql`, `16_views_lov.sql`.

@@ -211,6 +211,12 @@ CREATE OR REPLACE PACKAGE lms_session_pkg AS
                           p_seats IN NUMBER, p_meeting_url IN VARCHAR2 DEFAULT NULL,
                           p_min_attendance_pct IN NUMBER DEFAULT 80) RETURN NUMBER;
   PROCEDURE publish_session(p_session_id IN NUMBER);
+  /* ---- venues (SESSION_MANAGE with ALL scope: training administrators) ---- */
+  /* p_venue_id NULL = create. Deactivating, or lowering the capacity below the seats of an upcoming session, is refused. */
+  FUNCTION save_venue(p_venue_id IN NUMBER, p_name_en IN VARCHAR2, p_name_ar IN VARCHAR2, p_address IN VARCHAR2,
+                      p_capacity IN NUMBER, p_active_flag IN VARCHAR2) RETURN NUMBER;
+  /* Only a venue that never hosted a session can be deleted; otherwise deactivate it. */
+  PROCEDURE remove_venue(p_venue_id IN NUMBER);
   PROCEDURE register(p_session_id IN NUMBER, p_status OUT VARCHAR2);
   PROCEDURE cancel_registration(p_session_enrollment_id IN NUMBER);
   PROCEDURE cancel_session(p_session_id IN NUMBER, p_reason IN VARCHAR2 DEFAULT NULL);
@@ -248,6 +254,10 @@ CREATE OR REPLACE PACKAGE lms_feedback_pkg AS
   PROCEDURE submit_answer(p_enrollment_id IN NUMBER, p_question_id IN NUMBER,
                           p_rating IN NUMBER DEFAULT NULL, p_comment IN VARCHAR2 DEFAULT NULL);
   PROCEDURE set_review_visibility(p_review_id IN NUMBER, p_visible IN BOOLEAN);
+  /* JOB (daily): one reminder per completed enrolment, FEEDBACK_REMINDER_DAYS after completion (0 = off) and not older than
+     FEEDBACK_REMINDER_WINDOW_DAYS, only while a review or a questionnaire answer is still missing and the learner is ACTIVE.
+     Returns the number of reminders queued (for the job log). */
+  FUNCTION send_reminders RETURN NUMBER;
   /* Owner may edit a review for REVIEW_EDIT_DAYS days after it was written (0 = reviews are final). */
   PROCEDURE update_review(p_review_id IN NUMBER, p_course_rating IN NUMBER,
                           p_instructor_rating IN NUMBER DEFAULT NULL, p_review_text IN VARCHAR2 DEFAULT NULL);

@@ -1137,6 +1137,64 @@ CREATE OR REPLACE PACKAGE BODY lms_session_pkg AS
     END IF;
   END promote_session_waitlist;
 
+  -- ----------------------------------------------------------------------------- venues -----
+  PROCEDURE assert_venue_admin IS
+  BEGIN
+    lms_security_pkg.require_permission('SESSION_MANAGE');
+    IF lms_security_pkg.permission_scope('SESSION_MANAGE') <> 'ALL' THEN
+      lms_audit_pkg.log_event('ACCESS_DENIED', 'VENUE', NULL, 'DENIED');
+      RAISE_APPLICATION_ERROR(-20403, 'Not authorized');
+    END IF;
+  END assert_venue_admin;
+
+  FUNCTION save_venue(p_venue_id IN NUMBER, p_name_en IN VARCHAR2, p_name_ar IN VARCHAR2, p_address IN VARCHAR2,
+                      p_capacity IN NUMBER, p_active_flag IN VARCHAR2) RETURN NUMBER IS
+    l_id NUMBER := p_venue_id; l_n NUMBER;
+  BEGIN
+    assert_venue_admin;
+    lms_rate_limit_pkg.enforce_limit('ADMIN_WRITE');
+    IF p_name_en IS NULL OR LENGTH(TRIM(p_name_en)) = 0 OR p_active_flag NOT IN ('Y','N')
+       OR (p_capacity IS NOT NULL AND (p_capacity <= 0 OR p_capacity <> TRUNC(p_capacity))) THEN
+      RAISE_APPLICATION_ERROR(-20400, 'Invalid venue (name required, capacity a positive whole number)');
+    END IF;
+    SELECT COUNT(*) INTO l_n FROM lms_venues
+     WHERE UPPER(TRIM(name_en)) = UPPER(TRIM(p_name_en)) AND active_flag = 'Y' AND venue_id <> NVL(l_id, -1);
+    IF l_n > 0 AND p_active_flag = 'Y' THEN RAISE_APPLICATION_ERROR(-20409, 'An active venue with this name already exists'); END IF;
+
+    IF l_id IS NULL THEN
+      INSERT INTO lms_venues (name_en, name_ar, address, capacity, active_flag)
+      VALUES (TRIM(p_name_en), p_name_ar, SUBSTR(p_address, 1, 500), p_capacity, p_active_flag) RETURNING venue_id INTO l_id;
+    ELSE
+      BEGIN SELECT venue_id INTO l_n FROM lms_venues WHERE venue_id = l_id FOR UPDATE;
+      EXCEPTION WHEN NO_DATA_FOUND THEN RAISE_APPLICATION_ERROR(-20404, 'Venue not found'); END;
+      IF p_active_flag = 'N' THEN
+        SELECT COUNT(*) INTO l_n FROM lms_training_sessions
+         WHERE venue_id = l_id AND status IN ('SCHEDULED','PUBLISHED') AND end_ts > SYSTIMESTAMP;
+        IF l_n > 0 THEN RAISE_APPLICATION_ERROR(-20409, 'The venue has upcoming sessions. Reschedule or cancel them first.'); END IF;
+      END IF;
+      IF p_capacity IS NOT NULL THEN
+        SELECT COUNT(*) INTO l_n FROM lms_training_sessions
+         WHERE venue_id = l_id AND status IN ('SCHEDULED','PUBLISHED') AND end_ts > SYSTIMESTAMP AND seats > p_capacity;
+        IF l_n > 0 THEN RAISE_APPLICATION_ERROR(-20409, 'An upcoming session has more seats than the new capacity'); END IF;
+      END IF;
+      UPDATE lms_venues SET name_en = TRIM(p_name_en), name_ar = p_name_ar, address = SUBSTR(p_address, 1, 500),
+             capacity = p_capacity, active_flag = p_active_flag WHERE venue_id = l_id;
+    END IF;
+    lms_audit_pkg.log_event('VENUE_SAVE', 'VENUE', l_id);
+    RETURN l_id;
+  END save_venue;
+
+  PROCEDURE remove_venue(p_venue_id IN NUMBER) IS
+    l_n NUMBER;
+  BEGIN
+    assert_venue_admin;
+    SELECT COUNT(*) INTO l_n FROM lms_training_sessions WHERE venue_id = p_venue_id;
+    IF l_n > 0 THEN RAISE_APPLICATION_ERROR(-20409, 'The venue hosted sessions and cannot be deleted. Deactivate it instead.'); END IF;
+    DELETE FROM lms_venues WHERE venue_id = p_venue_id;
+    IF SQL%ROWCOUNT = 0 THEN RAISE_APPLICATION_ERROR(-20404, 'Venue not found'); END IF;
+    lms_audit_pkg.log_event('VENUE_REMOVE', 'VENUE', p_venue_id);
+  END remove_venue;
+
   FUNCTION create_session(p_course_id IN NUMBER, p_venue_id IN NUMBER, p_instructor_id IN NUMBER,
                           p_start_ts IN TIMESTAMP WITH TIME ZONE, p_end_ts IN TIMESTAMP WITH TIME ZONE,
                           p_seats IN NUMBER, p_meeting_url IN VARCHAR2 DEFAULT NULL,
@@ -1153,6 +1211,16 @@ CREATE OR REPLACE PACKAGE BODY lms_session_pkg AS
     BEGIN SELECT status INTO l_ist FROM lms_users WHERE user_id = p_instructor_id;
     EXCEPTION WHEN NO_DATA_FOUND THEN RAISE_APPLICATION_ERROR(-20404, 'Instructor not found'); END;
     IF l_ist <> 'ACTIVE' THEN RAISE_APPLICATION_ERROR(-20409, 'Instructor is not active'); END IF;
+    IF p_venue_id IS NOT NULL THEN
+      DECLARE l_cap NUMBER; l_act CHAR(1); BEGIN
+        BEGIN SELECT capacity, active_flag INTO l_cap, l_act FROM lms_venues WHERE venue_id = p_venue_id;
+        EXCEPTION WHEN NO_DATA_FOUND THEN RAISE_APPLICATION_ERROR(-20404, 'Venue not found'); END;
+        IF l_act <> 'Y' THEN RAISE_APPLICATION_ERROR(-20409, 'The venue is inactive'); END IF;
+        IF l_cap IS NOT NULL AND p_seats > l_cap THEN
+          RAISE_APPLICATION_ERROR(-20400, 'Seats (' || p_seats || ') exceed the venue capacity (' || l_cap || ')');
+        END IF;
+      END;
+    END IF;
     IF has_conflict(p_venue_id, p_instructor_id, p_start_ts, p_end_ts, NULL) THEN
       RAISE_APPLICATION_ERROR(-20409, 'Venue or instructor is already booked in that period');
     END IF;

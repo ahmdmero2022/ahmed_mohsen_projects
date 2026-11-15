@@ -10,7 +10,7 @@ Every list reads a `V_LMS_*` view that **itself checks the permission** (a mis-a
 > `case when :LMS_LANG = 'ar' and X_ar is not null then X_ar else X_en end` over the view's `X_en` / `X_ar` columns. Write it out in the region SQL
 > (or as a Cards/IR *computed column*); there is deliberately no PL/SQL function for it, to avoid a context switch per row.
 
-**Navigation (training admin)**: Dashboard (1) · Courses (10) · Approvals (12) · Reviews (14) · Feedback forms (15) · Enrolments (20) · Assignments (25) · Sessions (30) · Certificates (40) · Categories (50).
+**Navigation (training admin)**: Dashboard (1) · Courses (10) · Approvals (12) · Reviews (14) · Feedback forms (15) · Enrolments (20) · Assignments (25) · Sessions (30) · Venues (31) · Certificates (40) · Categories (50).
 **Navigation (system admin)**: Settings (60) · Notification templates (61) · Users (70) · Roles & permissions (73) · Audit (80) · Security events (81) · Integration logs (82) · Rate limits (90) · Monitoring (95).
 
 | Pg | Name | Scheme | Pg | Name | Scheme |
@@ -20,7 +20,7 @@ Every list reads a `V_LMS_*` view that **itself checks the permission** (a mis-a
 | 12 | Approvals inbox | APPROVER | 73 | Roles & permissions matrix | ROLE_ADMIN |
 | 20 / 21 | Enrolments / Assign dialog | ENROLL_ASSIGN | 80 | Audit log | AUDIT |
 | 25 / 26 | Mandatory assignments / New assignment | ENROLL_ASSIGN | 81 | Security events | AUDIT |
-| 30 | Training schedule (sessions) | SESSION_MANAGE | 82 | Integration logs | AUDIT |
+| 30 / 31 | Training schedule (sessions) / Venues | SESSION_MANAGE | 82 | Integration logs | AUDIT |
 | 40 / 41 / 42 | Certificates / Revoke dialog / Templates | CERT_POLICY | 90 | Rate-limit policies | RATELIMIT |
 | 50 | Categories | TRAINING_ADMIN | 95 | Monitoring dashboard | AUDIT |
 | 14 / 15 | Reviews moderation / Feedback forms & questions | TRAINING_ADMIN | | | |
@@ -50,6 +50,12 @@ IR on `v_lms_approvals_inbox` (course publication + enrolments the caller may de
 
 ## Page 30 — Training schedule
 Calendar + IR on `v_lms_sessions_manage` (admins: scope ALL); *New session* / *Publish* / *Cancel* / *Reschedule* / *Attendance* open app 210 pages 41/42 (same package calls). Facets: course, instructor, venue, status.
+
+## Page 31 — Venues
+Authorization `LMS_AUTH_SESSION_MANAGE` **and** a region condition on scope ALL (instructors hold the permission with ASSIGNED scope and cannot maintain venues; the view returns no rows to them and the package refuses). IG on `v_lms_venues_admin`: name EN/AR, address, capacity (empty = unlimited), active; read-only `sessions_total`, `sessions_upcoming`, `max_upcoming_seats` (shown so the administrator sees why a change will be refused).
+Save per row: `:VENUE_ID := lms_session_pkg.save_venue(:VENUE_ID, :NAME_EN, :NAME_AR, :ADDRESS, :CAPACITY, :ACTIVE_FLAG);`
+Delete (offered only when `sessions_total = 0`): `lms_session_pkg.remove_venue(:VENUE_ID);` — otherwise deactivate.
+Rules enforced in the package (the grid only explains them): unique active name (case-insensitive), capacity a positive whole number, **no deactivation or capacity cut below the seats of an upcoming session**, no deletion of a venue that ever hosted a session. Session creation (app 210 page 41) also refuses inactive venues and seats above the venue capacity.
 
 ## Pages 40/41/42 — Certificates
 **40**: IR on `v_lms_certificates_admin` (number, holder, title, issued, expires, status). Row action *Revoke* → **41** (dialog, `P41_CERTIFICATE_ID` protected, reason required ≥ 5 chars): `lms_certification_pkg.revoke(:P41_CERTIFICATE_ID, :P41_REASON);` (rate limited, audited, learner notified). **42**: certificate templates IG on `v_lms_templates_cert` (code, names, validity months, wording text, active); save → `:TEMPLATE_ID := lms_admin_pkg.save_certificate_template(:TEMPLATE_ID, :TEMPLATE_CODE, :NAME_EN, :NAME_AR, :VALIDITY_MONTHS, :BODY_TEXT, :ACTIVE_FLAG);` (plain-text wording only; layout is page 61 of app 200).

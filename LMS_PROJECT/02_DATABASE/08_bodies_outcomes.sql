@@ -389,6 +389,35 @@ CREATE OR REPLACE PACKAGE BODY lms_feedback_pkg AS
      WHERE course_id = p_course_id;
     lms_audit_pkg.log_event('FEEDBACK_FORM_ASSIGN', 'COURSE', p_course_id, 'SUCCESS', lms_util_pkg.js('form', NVL(TO_CHAR(p_form_id), 'NONE')));
   END assign_form;
+  -- ------------------------------------------------------------------- reminders (JOB) -----
+  FUNCTION send_reminders RETURN NUMBER IS
+    l_after  NUMBER := lms_util_pkg.get_number('FEEDBACK_REMINDER_DAYS', 3);
+    l_window NUMBER := lms_util_pkg.get_number('FEEDBACK_REMINDER_WINDOW_DAYS', 30);
+    l_sent   NUMBER := 0;
+    CURSOR c IS
+      SELECT e.enrollment_id, e.user_id, co.title_en
+        FROM lms_enrollments e
+        JOIN lms_courses co ON co.course_id = e.course_id
+        JOIN lms_users u ON u.user_id = e.user_id AND u.status = 'ACTIVE'
+       WHERE e.status = 'COMPLETED' AND e.feedback_reminded_at IS NULL
+         AND e.completed_at <= SYSTIMESTAMP - NUMTODSINTERVAL(l_after, 'DAY')
+         AND e.completed_at >= SYSTIMESTAMP - NUMTODSINTERVAL(l_window, 'DAY')
+         AND (NOT EXISTS (SELECT 1 FROM lms_course_reviews r WHERE r.enrollment_id = e.enrollment_id)
+              OR (SELECT COUNT(*) FROM lms_feedback_responses fr WHERE fr.enrollment_id = e.enrollment_id)
+                 < (SELECT COUNT(*) FROM lms_feedback_questions q WHERE q.form_id = co.feedback_form_id))
+         FOR UPDATE OF e.feedback_reminded_at SKIP LOCKED;
+  BEGIN
+    IF l_after <= 0 THEN RETURN 0; END IF;                       -- disabled by policy
+    FOR r IN c LOOP
+      lms_notification_pkg.enqueue(r.user_id, 'FEEDBACK_REMINDER', lms_util_pkg.js('course', r.title_en));
+      UPDATE lms_enrollments SET feedback_reminded_at = SYSTIMESTAMP WHERE CURRENT OF c;   -- never reminded twice
+      l_sent := l_sent + 1;
+    END LOOP;
+    IF l_sent > 0 THEN
+      lms_audit_pkg.log_event('FEEDBACK_REMINDERS', 'ENROLLMENT', NULL, 'SUCCESS', lms_util_pkg.js('queued', l_sent));
+    END IF;
+    RETURN l_sent;
+  END send_reminders;
 END lms_feedback_pkg;
 /
 

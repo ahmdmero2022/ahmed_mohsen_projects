@@ -25,7 +25,7 @@ member has a body; the validation script's table list equals the DDL. **Not run:
 | `15_views_apex.sql` | 46 views behind the APEX pages: learner, approvals, authoring, administration, monitoring, analytics |
 | `16_views_lov.sql` | 30 lookup, detail, maintenance, skills and feedback views (LOVs, course outline, prerequisites, instructors, popularity, admin lists, anonymised feedback analytics) |
 
-Counts: 56 tables, 91 views, 22 packages (158 public members), 7 scheduler jobs, 10 rate-limit policies, 23 bilingual notification templates.
+Counts: 56 tables, 92 views, 22 packages (161 public members), 8 application scheduler jobs (+ the rate-limit purge), 10 rate-limit policies, 24 bilingual notification templates.
 
 ## Prerequisites
 - Schema owner privileges: `CREATE SESSION/TABLE/VIEW/SEQUENCE/PROCEDURE/JOB`, tablespace quota; **no DBA role**.
@@ -61,3 +61,11 @@ APEX page/process definitions, ORDS modules, WAF rules, PDF layout for certifica
 | | `update_review` | review owner | window = setting `REVIEW_EDIT_DAYS` (default 0 = final) |
 Settings added: `FEEDBACK_MIN_RESPONSES` (5; instructors see aggregates/comments only above this), `REVIEW_EDIT_DAYS` (0).
 Tests: `06_TESTING/UNIT_TESTS/skills_feedback_tests.sql` (impersonates `TD_*` users through APEX sessions; rolls back).
+
+## Venue maintenance and feedback reminders (latest addition)
+| Package | Procedure | Rules |
+|---|---|---|
+| `LMS_SESSION_PKG` | `save_venue`, `remove_venue` | `SESSION_MANAGE` with **ALL** scope only (instructors excluded); unique active name; positive whole capacity; deactivation and capacity cuts refused while upcoming sessions would be affected; delete only if the venue never hosted a session |
+| `LMS_SESSION_PKG` | `create_session` (extended) | refuses inactive venues and seats above the venue capacity |
+| `LMS_FEEDBACK_PKG` | `send_reminders` (JOB `LMS_FEEDBACK_JOB`, daily 09:25) | one reminder per completed enrolment, `FEEDBACK_REMINDER_DAYS` (3; 0 = off) after completion and within `FEEDBACK_REMINDER_WINDOW_DAYS` (30); only while a review or a questionnaire answer is missing; active learners only; marker `LMS_ENROLLMENTS.FEEDBACK_REMINDED_AT` guarantees it is never sent twice; locks rows with `SKIP LOCKED` so overlapping runs cannot double-send |
+Schema changes: `LMS_ENROLLMENTS.FEEDBACK_REMINDED_AT`, index `LMS_ENR_DONE_IX (STATUS, COMPLETED_AT)`, check `LMS_VEN_CAP_CK`. Tests: `06_TESTING/UNIT_TESTS/venues_reminders_tests.sql`.

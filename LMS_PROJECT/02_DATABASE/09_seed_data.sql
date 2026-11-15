@@ -116,7 +116,9 @@ USING (SELECT 'RETAIN_AUDIT_DAYS' k, '2555' v, 'Audit log retention (days)' d FR
        SELECT 'MAIL_FROM', 'lms-noreply@example.invalid', 'Sender address (set per environment)' FROM dual UNION ALL
        SELECT 'APEX_WORKSPACE', 'LMS', 'APEX workspace name used by APEX_MAIL from jobs (set per environment)' FROM dual UNION ALL
        SELECT 'FEEDBACK_MIN_RESPONSES', '5', 'Minimum responses before course feedback is shown to instructors (anonymity)' FROM dual UNION ALL
-       SELECT 'REVIEW_EDIT_DAYS', '0', 'Days a learner may edit a review (0 = reviews are final)' FROM dual) s
+       SELECT 'REVIEW_EDIT_DAYS', '0', 'Days a learner may edit a review (0 = reviews are final)' FROM dual UNION ALL
+       SELECT 'FEEDBACK_REMINDER_DAYS', '3', 'Days after completion to remind a learner to give feedback (0 = off)' FROM dual UNION ALL
+       SELECT 'FEEDBACK_REMINDER_WINDOW_DAYS', '30', 'Do not remind for completions older than this many days' FROM dual) s
    ON (t.setting_key = s.k)
  WHEN NOT MATCHED THEN INSERT (setting_key, setting_value, description) VALUES (s.k, s.v, s.d);
 
@@ -209,6 +211,8 @@ BEGIN
     'شهادة قاربت على الانتهاء: {{title}}', 'تنتهي شهادتك "{{title}}" بتاريخ {{expires}} (بعد {{days}} يوم).');
   t('CERT_EXPIRED', 'Certificate expired: {{title}}', 'Your certificate "{{title}}" has expired.',
     'انتهت صلاحية الشهادة: {{title}}', 'انتهت صلاحية شهادتك "{{title}}".');
+  t('FEEDBACK_REMINDER', 'How was "{{course}}"?', 'You completed "{{course}}". Please take a minute to rate it and tell us what could be better.',
+    'ما رأيك في "{{course}}"؟', 'لقد أكملت دورة "{{course}}". نرجو أن تقيّمها وتخبرنا بما يمكن تحسينه، فذلك لا يستغرق سوى دقيقة.');
   t('CERT_REVOKED', 'Certificate revoked: {{title}}', 'Your certificate "{{title}}" was revoked.',
     'تم إلغاء الشهادة: {{title}}', 'تم إلغاء شهادتك "{{title}}".');
 END;
@@ -233,6 +237,7 @@ BEGIN
   j('LMS_PURGE_JOB',        'BEGIN lms_reporting_pkg.purge_logs; END;', 'FREQ=DAILY;BYHOUR=2;BYMINUTE=20');
   j('LMS_REMINDER_JOB',     'BEGIN lms_reporting_pkg.send_reminders; END;', 'FREQ=DAILY;BYHOUR=6;BYMINUTE=15');
   j('LMS_APPROVAL_ESC_JOB', 'BEGIN lms_approval_pkg.escalate_overdue; END;', 'FREQ=DAILY;BYHOUR=7;BYMINUTE=5');
+  j('LMS_FEEDBACK_JOB',     'DECLARE n NUMBER; BEGIN n := lms_feedback_pkg.send_reminders; END;', 'FREQ=DAILY;BYHOUR=9;BYMINUTE=25');
 END;
 /
 COMMIT;

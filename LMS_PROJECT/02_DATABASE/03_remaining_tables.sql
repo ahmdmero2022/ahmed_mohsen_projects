@@ -317,7 +317,8 @@ CREATE TABLE lms_venues (
   address     VARCHAR2(500),
   capacity    NUMBER(5),
   active_flag CHAR(1) DEFAULT 'Y' NOT NULL,
-  CONSTRAINT lms_ven_act_ck CHECK (active_flag IN ('Y','N'))
+  CONSTRAINT lms_ven_act_ck CHECK (active_flag IN ('Y','N')),
+  CONSTRAINT lms_ven_cap_ck CHECK (capacity IS NULL OR capacity > 0)
 );
 
 CREATE TABLE lms_training_sessions (
