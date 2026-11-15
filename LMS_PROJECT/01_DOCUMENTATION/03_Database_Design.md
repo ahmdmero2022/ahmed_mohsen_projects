@@ -1,6 +1,6 @@
 # 03 — Database Design (Steps 4 & 5)
 
-DDL status: tables marked **[DDL]** exist in `02_DATABASE/01_core_schema.sql` (not executed). Tables marked **[SPEC]** are designed here but their DDL is outstanding work (doc 08). The Mermaid diagrams show relationships; those involving **[SPEC]** tables are the intended design and must be re-checked against DDL when written (rule: ERD never shows a relationship the DDL lacks).
+DDL status: **all tables in this document now have DDL** in `02_DATABASE/01_core_schema.sql` and `03_remaining_tables.sql` (written, not executed against Oracle). The **[SPEC]** tags below are historical: the DDL exists, but the ERD diagrams have **not yet been re-reconciled line by line** with it. Known differences are listed in section 5 ("Changes made while writing the DDL"); treat the DDL as authoritative.
 
 ## 1. Integrated high-level ERD
 
@@ -213,3 +213,18 @@ Deviation from prompt: `LMS_RATE_LIMIT_POLICIES` adds `FAIL_MODE` (required by "
 | Certificate expiry sweep | `(status, expires_at)` on LMS_CERTIFICATES [SPEC] |
 | Manager subtree | `LMS_USR_MGR_IX` |
 Impact: each index adds write cost; hottest write tables are LMS_LESSON_PROGRESS and LMS_ENROLLMENTS, so they carry only the indexes above. Verify with `DBMS_XPLAN.DISPLAY_CURSOR(format=>'ALLSTATS LAST')` after load tests; drop unused indexes found via `DBA_INDEX_USAGE`/monitoring (19c: `V$OBJECT_USAGE` with `ALTER INDEX ... MONITORING USAGE`).
+
+## 5. Changes made while writing the DDL (DDL is authoritative)
+| Area | Change |
+|---|---|
+| `LMS_ENR_ACTIVE_UK` | Excludes `COMPLETED` as well as CANCELLED/FAILED/EXPIRED so a renewal cycle can start; re-taking is policed in `LMS_ENROLLMENT_PKG` |
+| `LMS_ENROLLMENTS` | + `INSTRUCTOR_APPROVED_FLAG` (completion rule INSTRUCTOR_APPROVAL) |
+| `LMS_COURSES` | + `CERTIFICATE_TEMPLATE_ID` (FK), `FEEDBACK_FORM_ID` (FK) |
+| `LMS_LEARNING_PATHS` | + `CERTIFICATE_TEMPLATE_ID` (FK) |
+| `LMS_CERTIFICATES` | Course **or** path source (`ENROLLMENT_ID` xor `PATH_ENROLLMENT_ID`), snapshot titles, no `CYCLE_NO` (a renewal is a new enrollment); idempotency by function-based unique indexes |
+| `LMS_APPROVALS` | Implemented as a table (not APEX's Approvals component) so the same rules run from PL/SQL, jobs and APEX; one open request per entity (unique index) |
+| `LMS_QUESTION_OPTIONS` | `MATCH_KEY` (right-hand side of matching) and accepted answers for SHORT questions; answer data, never exposed by learner views |
+| `LMS_QUIZ_ATTEMPTS` | Unique index allowing one `IN_PROGRESS` attempt per quiz+user |
+| `LMS_QUIZ_RESPONSES` | Rows are created at attempt start (fixes the random question set); `SORT_ORDER` column |
+| `LMS_SUM_*` | Summary tables for dashboards instead of materialised views |
+| Not created | `LMS_USER_MANAGERS` (single manager column), `LMS_FEEDBACK_FORMS` attached per course |

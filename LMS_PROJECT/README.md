@@ -7,10 +7,10 @@ Design package and implementation blueprint. Document version 0.1 (draft for rev
 | Item | Status |
 |---|---|
 | Design documents (requirements, architecture, ERD, flows, UI, security, testing, deployment) | **Written** — see index below |
-| SQL/PL/SQL in `02_DATABASE/` | **Written, NOT executed.** No Oracle 19c instance was available in this session. Treat as reviewed-by-eye code that must be compiled and tested in a dev schema |
+| SQL/PL/SQL in `02_DATABASE/` | **Written, NOT compiled or executed.** No Oracle 19c instance was available. Treat as reviewed code that must be installed (`00_install.sql`) and tested in a dev schema |
 | APEX application export (`f*.sql`) | **Not produced.** Page specifications only; cannot be validated without an APEX 24.1 workspace |
 | Test results | **None.** Test cases are defined; all "Actual result" fields are blank |
-| Full DDL for all ~75 tables | **Incomplete.** Core tables implemented (see `02_DATABASE/README`); remainder listed as outstanding work in doc 08 |
+| Database scripts (56 tables, 16 views, 18 packages, seeds, jobs, validation, rollback) | **Written, not executed.** Static consistency checks run; see `02_DATABASE/README.md` |
 
 ## Index
 

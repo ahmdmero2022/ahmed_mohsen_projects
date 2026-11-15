@@ -1,10 +1,83 @@
 -- =============================================================================
--- Packages: LMS_AUDIT_PKG, LMS_SECURITY_PKG (minimal), LMS_RATE_LIMIT_PKG,
---           LMS_ENROLLMENT_PKG (core path)           STATUS: NOT compiled/executed
+-- Packages: LMS_UTIL_PKG, LMS_SECURITY_PKG, LMS_AUDIT_PKG, LMS_RATE_LIMIT_PKG + rate-limit seed/job
+--           (enrollment moved to 05/06)               STATUS: NOT compiled/executed
 -- Depends on 01_core_schema.sql. Needs: GRANT EXECUTE on SYS.DBMS_CRYPTO to the
 -- schema owner (used for hashing rate-limit subjects).
 -- Transaction rule: only autonomous procedures here COMMIT; callers own the txn.
 -- =============================================================================
+
+-- ----------------------------------------------------------------- UTIL ----
+CREATE OR REPLACE PACKAGE lms_util_pkg AS
+  FUNCTION get_setting(p_key IN VARCHAR2, p_default IN VARCHAR2 DEFAULT NULL) RETURN VARCHAR2;
+  FUNCTION get_number(p_key IN VARCHAR2, p_default IN NUMBER) RETURN NUMBER;
+  /* Cryptographically random code from an unambiguous 32-character alphabet. */
+  FUNCTION random_code(p_len IN PLS_INTEGER) RETURN VARCHAR2;
+  FUNCTION new_uuid RETURN VARCHAR2;
+  /* Builds a flat JSON object string from up to 6 key/value pairs (NULL key = unused).
+     Pure PL/SQL (JSON_OBJECT_T) so it is safe to call from PL/SQL expressions. */
+  FUNCTION js(p_k1 IN VARCHAR2, p_v1 IN VARCHAR2,
+              p_k2 IN VARCHAR2 DEFAULT NULL, p_v2 IN VARCHAR2 DEFAULT NULL,
+              p_k3 IN VARCHAR2 DEFAULT NULL, p_v3 IN VARCHAR2 DEFAULT NULL,
+              p_k4 IN VARCHAR2 DEFAULT NULL, p_v4 IN VARCHAR2 DEFAULT NULL,
+              p_k5 IN VARCHAR2 DEFAULT NULL, p_v5 IN VARCHAR2 DEFAULT NULL,
+              p_k6 IN VARCHAR2 DEFAULT NULL, p_v6 IN VARCHAR2 DEFAULT NULL) RETURN VARCHAR2;
+END lms_util_pkg;
+/
+CREATE OR REPLACE PACKAGE BODY lms_util_pkg AS
+  c_alphabet CONSTANT VARCHAR2(32) := 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+
+  FUNCTION get_setting(p_key IN VARCHAR2, p_default IN VARCHAR2 DEFAULT NULL) RETURN VARCHAR2 IS
+    l_val lms_system_settings.setting_value%TYPE;
+  BEGIN
+    SELECT setting_value INTO l_val FROM lms_system_settings WHERE setting_key = p_key;
+    RETURN l_val;
+  EXCEPTION WHEN NO_DATA_FOUND THEN
+    RETURN p_default;
+  END get_setting;
+
+  FUNCTION get_number(p_key IN VARCHAR2, p_default IN NUMBER) RETURN NUMBER IS
+    l_val VARCHAR2(1000) := get_setting(p_key);
+  BEGIN
+    IF l_val IS NULL OR VALIDATE_CONVERSION(l_val AS NUMBER) = 0 THEN
+      RETURN p_default;
+    END IF;
+    RETURN TO_NUMBER(l_val);
+  END get_number;
+
+  FUNCTION random_code(p_len IN PLS_INTEGER) RETURN VARCHAR2 IS
+    l_raw  RAW(64) := DBMS_CRYPTO.randombytes(p_len);
+    l_out  VARCHAR2(64);
+  BEGIN
+    FOR i IN 1 .. p_len LOOP
+      l_out := l_out || SUBSTR(c_alphabet,
+                 MOD(TO_NUMBER(RAWTOHEX(UTL_RAW.substr(l_raw, i, 1)), 'XX'), 32) + 1, 1);
+    END LOOP;
+    RETURN l_out;
+  END random_code;
+
+  FUNCTION new_uuid RETURN VARCHAR2 IS
+  BEGIN
+    RETURN LOWER(REGEXP_REPLACE(RAWTOHEX(SYS_GUID()), '(.{8})(.{4})(.{4})(.{4})(.{12})', '\1-\2-\3-\4-\5'));
+  END new_uuid;
+
+  FUNCTION js(p_k1 IN VARCHAR2, p_v1 IN VARCHAR2,
+              p_k2 IN VARCHAR2 DEFAULT NULL, p_v2 IN VARCHAR2 DEFAULT NULL,
+              p_k3 IN VARCHAR2 DEFAULT NULL, p_v3 IN VARCHAR2 DEFAULT NULL,
+              p_k4 IN VARCHAR2 DEFAULT NULL, p_v4 IN VARCHAR2 DEFAULT NULL,
+              p_k5 IN VARCHAR2 DEFAULT NULL, p_v5 IN VARCHAR2 DEFAULT NULL,
+              p_k6 IN VARCHAR2 DEFAULT NULL, p_v6 IN VARCHAR2 DEFAULT NULL) RETURN VARCHAR2 IS
+    l_o JSON_OBJECT_T := JSON_OBJECT_T();
+  BEGIN
+    IF p_k1 IS NOT NULL THEN l_o.put(p_k1, p_v1); END IF;
+    IF p_k2 IS NOT NULL THEN l_o.put(p_k2, p_v2); END IF;
+    IF p_k3 IS NOT NULL THEN l_o.put(p_k3, p_v3); END IF;
+    IF p_k4 IS NOT NULL THEN l_o.put(p_k4, p_v4); END IF;
+    IF p_k5 IS NOT NULL THEN l_o.put(p_k5, p_v5); END IF;
+    IF p_k6 IS NOT NULL THEN l_o.put(p_k6, p_v6); END IF;
+    RETURN l_o.to_string;
+  END js;
+END lms_util_pkg;
+/
 
 -- Compile order: both SPECS first (they are mutually dependent), then both BODIES.
 -- ------------------------------------------------------------- SECURITY ----
@@ -19,6 +92,11 @@ CREATE OR REPLACE PACKAGE lms_security_pkg AS
   PROCEDURE require_permission(p_code IN VARCHAR2);
   /* TRUE if p_target is p_actor or in p_actor's reporting subtree. */
   FUNCTION is_in_subtree(p_actor IN NUMBER, p_target IN NUMBER) RETURN BOOLEAN;
+  /* Strongest scope the current user holds for a permission: ALL > TEAM > ASSIGNED > OWN, NULL if none. */
+  FUNCTION permission_scope(p_code IN VARCHAR2, p_user_id IN NUMBER DEFAULT NULL) RETURN VARCHAR2;
+  /* TRUE when the current user may act on p_target_user under permission p_code
+     (scope ALL, or TEAM and target in the reporting subtree, or OWN and target = self). */
+  FUNCTION can_manage_user(p_code IN VARCHAR2, p_target_user IN NUMBER) RETURN BOOLEAN;
 END lms_security_pkg;
 /
 -- ---------------------------------------------------------------- AUDIT ----
@@ -106,7 +184,7 @@ CREATE OR REPLACE PACKAGE BODY lms_security_pkg AS
   BEGIN
     IF NOT has_permission(p_code) THEN
       lms_audit_pkg.log_event('ACCESS_DENIED', 'PERMISSION', NULL, 'DENIED',
-                              JSON_OBJECT('permission' VALUE p_code));
+                              lms_util_pkg.js('permission', p_code));
       RAISE_APPLICATION_ERROR(-20403, 'Not authorized');
     END IF;
   END require_permission;
@@ -122,6 +200,34 @@ CREATE OR REPLACE PACKAGE BODY lms_security_pkg AS
      WHERE user_id = p_actor AND p_actor <> p_target;
     RETURN l_cnt > 0;
   END is_in_subtree;
+
+  FUNCTION permission_scope(p_code IN VARCHAR2, p_user_id IN NUMBER DEFAULT NULL) RETURN VARCHAR2 IS
+    l_user  NUMBER := COALESCE(p_user_id, current_user_id_safe);
+    l_scope VARCHAR2(10);
+  BEGIN
+    IF l_user IS NULL THEN RETURN NULL; END IF;
+    SELECT CASE MAX(CASE rp.scope WHEN 'ALL' THEN 4 WHEN 'TEAM' THEN 3 WHEN 'ASSIGNED' THEN 2 WHEN 'OWN' THEN 1 END)
+                WHEN 4 THEN 'ALL' WHEN 3 THEN 'TEAM' WHEN 2 THEN 'ASSIGNED' WHEN 1 THEN 'OWN' END
+      INTO l_scope
+      FROM lms_user_roles ur
+      JOIN lms_role_permissions rp ON rp.role_id = ur.role_id
+      JOIN lms_permissions p       ON p.permission_id = rp.permission_id
+     WHERE ur.user_id = l_user AND p.permission_code = p_code;
+    RETURN l_scope;
+  END permission_scope;
+
+  FUNCTION can_manage_user(p_code IN VARCHAR2, p_target_user IN NUMBER) RETURN BOOLEAN IS
+    l_actor NUMBER := current_user_id_safe;
+    l_scope VARCHAR2(10) := permission_scope(p_code, l_actor);
+  BEGIN
+    RETURN CASE
+             WHEN l_scope IS NULL THEN FALSE
+             WHEN l_scope = 'ALL' THEN TRUE
+             WHEN l_scope = 'TEAM' THEN is_in_subtree(l_actor, p_target_user) OR l_actor = p_target_user
+             WHEN l_scope = 'OWN' THEN l_actor = p_target_user
+             ELSE FALSE
+           END;
+  END can_manage_user;
 END lms_security_pkg;
 /
 
@@ -283,162 +389,6 @@ CREATE OR REPLACE PACKAGE BODY lms_rate_limit_pkg AS
 END lms_rate_limit_pkg;
 /
 
--- ----------------------------------------------------------- ENROLLMENT ----
-CREATE OR REPLACE PACKAGE lms_enrollment_pkg AS
-  /* Self-enrollment for the authenticated user. Idempotent: an existing active
-     enrollment is returned instead of raising. Caller owns COMMIT. */
-  PROCEDURE enroll_self(p_course_id IN NUMBER, p_enrollment_id OUT NUMBER, p_status OUT VARCHAR2);
-  /* Assignment by manager/admin (permission + scope checked). */
-  PROCEDURE assign(p_user_id IN NUMBER, p_course_id IN NUMBER, p_due_date IN DATE DEFAULT NULL,
-                   p_type IN VARCHAR2 DEFAULT 'ADMIN',
-                   p_enrollment_id OUT NUMBER, p_status OUT VARCHAR2);
-  PROCEDURE cancel(p_enrollment_id IN NUMBER);
-  /* Promote oldest WAITLISTED rows while seats are free. Call after cancel/capacity change. */
-  PROCEDURE promote_waitlist(p_course_id IN NUMBER);
-END lms_enrollment_pkg;
-/
-CREATE OR REPLACE PACKAGE BODY lms_enrollment_pkg AS
-
-  c_err_state   CONSTANT NUMBER := -20410;  -- course not open for enrollment
-  c_err_prereq  CONSTANT NUMBER := -20411;
-  c_err_closed  CONSTANT NUMBER := -20412;  -- deadline passed
-
-  FUNCTION seats_taken(p_course_id IN NUMBER) RETURN NUMBER IS
-    l_n NUMBER;
-  BEGIN
-    SELECT COUNT(*) INTO l_n FROM lms_enrollments
-     WHERE course_id = p_course_id AND status IN ('APPROVED','ENROLLED','IN_PROGRESS');
-    RETURN l_n;
-  END seats_taken;
-
-  PROCEDURE do_enroll(p_user_id IN NUMBER, p_course_id IN NUMBER, p_due IN DATE,
-                      p_type IN VARCHAR2, p_actor IN NUMBER,
-                      p_enrollment_id OUT NUMBER, p_status OUT VARCHAR2) IS
-    l_course  lms_courses%ROWTYPE;
-    l_missing NUMBER;
-    l_status  VARCHAR2(12);
-  BEGIN
-    -- Serialise per course: capacity decisions are made while holding this row lock.
-    SELECT * INTO l_course FROM lms_courses WHERE course_id = p_course_id FOR UPDATE;
-
-    -- Idempotency / BR-01
-    BEGIN
-      SELECT enrollment_id, status INTO p_enrollment_id, p_status
-        FROM lms_enrollments
-       WHERE user_id = p_user_id AND course_id = p_course_id
-         AND status NOT IN ('CANCELLED','FAILED','EXPIRED');
-      RETURN;
-    EXCEPTION WHEN NO_DATA_FOUND THEN NULL;
-    END;
-
-    -- BR-03
-    IF l_course.status <> 'PUBLISHED'
-       OR (l_course.available_from IS NOT NULL AND TRUNC(SYSDATE) < l_course.available_from)
-       OR (l_course.available_to   IS NOT NULL AND TRUNC(SYSDATE) > l_course.available_to) THEN
-      RAISE_APPLICATION_ERROR(c_err_state, 'Course is not open for enrollment');
-    END IF;
-    IF l_course.enroll_deadline IS NOT NULL AND TRUNC(SYSDATE) > l_course.enroll_deadline
-       AND p_type = 'SELF' THEN
-      RAISE_APPLICATION_ERROR(c_err_closed, 'Enrollment deadline has passed');
-    END IF;
-
-    -- BR-04 (set-based, single query)
-    SELECT COUNT(*) INTO l_missing
-      FROM lms_course_prerequisites p
-     WHERE p.course_id = p_course_id
-       AND NOT EXISTS (SELECT 1 FROM lms_enrollments e
-                        WHERE e.user_id = p_user_id AND e.course_id = p.prereq_course_id
-                          AND e.status = 'COMPLETED');
-    IF l_missing > 0 THEN
-      RAISE_APPLICATION_ERROR(c_err_prereq, 'Prerequisite courses not completed');
-    END IF;
-
-    -- Decide status (BR-02)
-    IF p_type = 'SELF' AND l_course.approval_required = 'Y' THEN
-      l_status := 'PENDING';
-    ELSIF l_course.capacity IS NOT NULL AND seats_taken(p_course_id) >= l_course.capacity THEN
-      l_status := 'WAITLISTED';
-    ELSE
-      l_status := 'ENROLLED';
-    END IF;
-
-    INSERT INTO lms_enrollments (user_id, course_id, status, enrollment_type, assigned_by, due_date)
-    VALUES (p_user_id, p_course_id, l_status, p_type, p_actor, p_due)
-    RETURNING enrollment_id INTO p_enrollment_id;
-    p_status := l_status;
-
-    lms_audit_pkg.log_event('ENROLL', 'ENROLLMENT', p_enrollment_id, 'SUCCESS',
-                            JSON_OBJECT('course' VALUE p_course_id, 'status' VALUE l_status));
-  END do_enroll;
-
-  PROCEDURE enroll_self(p_course_id IN NUMBER, p_enrollment_id OUT NUMBER, p_status OUT VARCHAR2) IS
-    l_user NUMBER := lms_security_pkg.current_user_id;
-  BEGIN
-    lms_security_pkg.require_permission('ENROLL_SELF');
-    lms_rate_limit_pkg.enforce_limit('COURSE_ENROLL', l_user);
-    do_enroll(l_user, p_course_id, NULL, 'SELF', l_user, p_enrollment_id, p_status);
-  END enroll_self;
-
-  PROCEDURE assign(p_user_id IN NUMBER, p_course_id IN NUMBER, p_due_date IN DATE DEFAULT NULL,
-                   p_type IN VARCHAR2 DEFAULT 'ADMIN',
-                   p_enrollment_id OUT NUMBER, p_status OUT VARCHAR2) IS
-    l_actor NUMBER := lms_security_pkg.current_user_id;
-  BEGIN
-    lms_security_pkg.require_permission('ENROLL_ASSIGN');
-    IF p_type NOT IN ('ADMIN','MANAGER','MANDATORY','BULK','RULE') THEN
-      RAISE_APPLICATION_ERROR(-20400, 'Invalid assignment type');
-    END IF;
-    -- Scope: managers only within their subtree (BR-13); admins have no TEAM restriction.
-    IF NOT lms_security_pkg.has_permission('REPORT_ORG')            -- admin/HR scope marker
-       AND NOT lms_security_pkg.is_in_subtree(l_actor, p_user_id) THEN
-      lms_audit_pkg.log_event('ACCESS_DENIED', 'ENROLLMENT', NULL, 'DENIED',
-                              JSON_OBJECT('target_user' VALUE p_user_id));
-      RAISE_APPLICATION_ERROR(-20403, 'Not authorized');
-    END IF;
-    lms_rate_limit_pkg.enforce_limit('ADMIN_WRITE', l_actor);
-    do_enroll(p_user_id, p_course_id, p_due_date, p_type, l_actor, p_enrollment_id, p_status);
-  END assign;
-
-  PROCEDURE cancel(p_enrollment_id IN NUMBER) IS
-    l_actor  NUMBER := lms_security_pkg.current_user_id;
-    l_enr    lms_enrollments%ROWTYPE;
-  BEGIN
-    SELECT * INTO l_enr FROM lms_enrollments WHERE enrollment_id = p_enrollment_id FOR UPDATE;
-    IF l_enr.user_id <> l_actor AND NOT lms_security_pkg.has_permission('ENROLL_ASSIGN') THEN
-      RAISE_APPLICATION_ERROR(-20403, 'Not authorized');
-    END IF;
-    IF l_enr.status IN ('COMPLETED','CANCELLED','FAILED','EXPIRED') THEN
-      RAISE_APPLICATION_ERROR(-20413, 'Enrollment cannot be cancelled in status ' || l_enr.status);
-    END IF;
-    UPDATE lms_enrollments SET status = 'CANCELLED', row_version = row_version + 1
-     WHERE enrollment_id = p_enrollment_id;
-    lms_audit_pkg.log_event('CANCEL', 'ENROLLMENT', p_enrollment_id);
-    promote_waitlist(l_enr.course_id);
-  END cancel;
-
-  PROCEDURE promote_waitlist(p_course_id IN NUMBER) IS
-    l_course lms_courses%ROWTYPE;
-    l_free   NUMBER;
-  BEGIN
-    SELECT * INTO l_course FROM lms_courses WHERE course_id = p_course_id FOR UPDATE;
-    IF l_course.capacity IS NULL THEN
-      l_free := 1000000;
-    ELSE
-      l_free := l_course.capacity - seats_taken(p_course_id);
-    END IF;
-    IF l_free > 0 THEN
-      UPDATE lms_enrollments
-         SET status = 'ENROLLED', row_version = row_version + 1
-       WHERE enrollment_id IN (
-               SELECT enrollment_id FROM lms_enrollments
-                WHERE course_id = p_course_id AND status = 'WAITLISTED'
-                ORDER BY enrolled_at, enrollment_id
-                FETCH FIRST l_free ROWS ONLY);
-    END IF;
-  END promote_waitlist;
-END lms_enrollment_pkg;
-/
-
 -- ---------------------------------------------------------- SEED POLICIES ----
 MERGE INTO lms_rate_limit_policies t
 USING (SELECT 'AUTH_ATTEMPT' op, 5 cnt, 900 win, 'CLOSED' fm FROM dual UNION ALL
@@ -454,12 +404,16 @@ USING (SELECT 'AUTH_ATTEMPT' op, 5 cnt, 900 win, 'CLOSED' fm FROM dual UNION ALL
       VALUES (s.op, s.cnt, s.win, s.fm);
 
 -- Cleanup job (every 15 minutes)
+DECLARE l_n NUMBER;
 BEGIN
+  SELECT COUNT(*) INTO l_n FROM user_scheduler_jobs WHERE job_name = 'LMS_RL_PURGE_JOB';
+  IF l_n = 0 THEN
   DBMS_SCHEDULER.create_job(
     job_name        => 'LMS_RL_PURGE_JOB',
     job_type        => 'PLSQL_BLOCK',
     job_action      => 'BEGIN lms_rate_limit_pkg.purge_expired; END;',
     repeat_interval => 'FREQ=MINUTELY;INTERVAL=15',
     enabled         => TRUE);
+  END IF;
 END;
 /

@@ -218,20 +218,23 @@ CREATE TABLE lms_enrollments (
   completed_at      TIMESTAMP WITH TIME ZONE,
   progress_pct      NUMBER(5,2) DEFAULT 0 NOT NULL,
   time_spent_sec    NUMBER(10) DEFAULT 0 NOT NULL,
+  instructor_approved_flag CHAR(1) DEFAULT 'N' NOT NULL,
   row_version       NUMBER DEFAULT 1 NOT NULL,
+  CONSTRAINT lms_enr_iapp_ck CHECK (instructor_approved_flag IN ('Y','N')),
   CONSTRAINT lms_enr_user_fk FOREIGN KEY (user_id) REFERENCES lms_users (user_id),
   CONSTRAINT lms_enr_course_fk FOREIGN KEY (course_id) REFERENCES lms_courses (course_id),
   CONSTRAINT lms_enr_by_fk FOREIGN KEY (assigned_by) REFERENCES lms_users (user_id),
   CONSTRAINT lms_enr_status_ck CHECK (status IN ('PENDING','APPROVED','ENROLLED','IN_PROGRESS','COMPLETED','FAILED','CANCELLED','EXPIRED','WAITLISTED')),
   CONSTRAINT lms_enr_type_ck CHECK (enrollment_type IN ('SELF','ADMIN','MANAGER','MANDATORY','BULK','RULE')),
   CONSTRAINT lms_enr_pct_ck CHECK (progress_pct BETWEEN 0 AND 100),
-  CONSTRAINT lms_enr_done_ck CHECK ((status = 'COMPLETED' AND completed_at IS NOT NULL) OR (status <> 'COMPLETED'))
+  CONSTRAINT lms_enr_done_ck CHECK (status <> 'COMPLETED' OR completed_at IS NOT NULL)
 );
--- BR-01: at most one ACTIVE enrollment per user+course (last line of defence).
--- Rows in inactive states have both expressions NULL and are not indexed.
+-- BR-01: at most one OPEN enrollment per user+course (last line of defence).
+-- Terminal states (incl. COMPLETED, so a renewal cycle can start) have both expressions NULL
+-- and are not indexed. Re-taking a completed course is policed in LMS_ENROLLMENT_PKG.
 CREATE UNIQUE INDEX lms_enr_active_uk ON lms_enrollments (
-  CASE WHEN status NOT IN ('CANCELLED','FAILED','EXPIRED') THEN user_id   END,
-  CASE WHEN status NOT IN ('CANCELLED','FAILED','EXPIRED') THEN course_id END);
+  CASE WHEN status NOT IN ('CANCELLED','FAILED','EXPIRED','COMPLETED') THEN user_id   END,
+  CASE WHEN status NOT IN ('CANCELLED','FAILED','EXPIRED','COMPLETED') THEN course_id END);
 CREATE INDEX lms_enr_user_status_ix ON lms_enrollments (user_id, status);
 CREATE INDEX lms_enr_course_status_ix ON lms_enrollments (course_id, status);
 CREATE INDEX lms_enr_due_ix ON lms_enrollments (due_date, status);
