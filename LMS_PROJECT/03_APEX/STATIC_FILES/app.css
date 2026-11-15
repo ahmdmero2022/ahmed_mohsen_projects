@@ -1,0 +1,123 @@
+/* =============================================================================
+   LMS application stylesheet  (Application static file: app.css, referenced as #APP_FILES#app#MIN#.css)
+   Built on Universal Theme. STATUS: written, not rendered in a browser.
+   Rules: colours only via custom properties (dark theme = a second token block later);
+          logical properties only (RTL-safe); no !important except for the focus ring.
+   ============================================================================= */
+:root {
+  --lms-primary: #2563EB;
+  --lms-primary-dark: #1D4ED8;      /* hover; white text contrast >= 6:1 */
+  --lms-secondary: #0F172A;
+  --lms-bg: #F8FAFC;
+  --lms-card: #FFFFFF;
+  --lms-text: #1E293B;
+  --lms-text-muted: #64748B;        /* 4.8:1 on white: use for secondary text only, not for essential labels on tinted fills */
+  --lms-border: #E2E8F0;
+  --lms-success: #16A34A;
+  --lms-warning: #F59E0B;           /* fill only; never as text colour on white (fails AA) */
+  --lms-danger: #DC2626;
+  --lms-radius: 12px;
+  --lms-radius-sm: 8px;
+  --lms-shadow: 0 1px 3px rgba(15, 23, 42, .08), 0 1px 2px rgba(15, 23, 42, .04);
+  --lms-gap: 16px;
+
+  /* map onto Universal Theme variables so native components pick the palette up */
+  --ut-palette-primary: var(--lms-primary);
+  --ut-palette-primary-contrast: #FFFFFF;
+  --ut-palette-success: var(--lms-success);
+  --ut-palette-warning: var(--lms-warning);
+  --ut-palette-danger: var(--lms-danger);
+  --ut-body-background-color: var(--lms-bg);
+  --ut-body-text-color: var(--lms-text);
+}
+
+body { background: var(--lms-bg); color: var(--lms-text); }
+:lang(ar) body, html[lang="ar"] body { font-family: "Noto Sans Arabic", Tajawal, "Segoe UI", sans-serif; }
+
+/* ---- focus (WCAG 2.4.7 / 2.4.11): always visible, never colour-only -------------------- */
+:focus-visible { outline: 2px solid var(--lms-primary) !important; outline-offset: 2px !important; }
+
+/* ---- cards (Cards region, template "Cards: Standard" + static id lms-course-cards) ----- */
+.lms-cards .a-CardView-item,
+.lms-cards .t-Cards-item {
+  background: var(--lms-card); border: 1px solid var(--lms-border);
+  border-radius: var(--lms-radius); box-shadow: var(--lms-shadow);
+  transition: box-shadow .15s ease, transform .15s ease;
+}
+.lms-cards .a-CardView-item:hover { box-shadow: 0 4px 12px rgba(15, 23, 42, .12); transform: translateY(-1px); }
+.lms-card-thumb { aspect-ratio: 16 / 9; width: 100%; object-fit: cover; border-start-start-radius: var(--lms-radius); border-start-end-radius: var(--lms-radius); background: var(--lms-border); }
+.lms-card-meta { color: var(--lms-text-muted); font-size: 13px; display: flex; flex-wrap: wrap; gap: 4px 12px; margin-block-start: 4px; }
+.lms-card-title { font-weight: 600; font-size: 16px; line-height: 1.35; color: var(--lms-text); }
+
+/* ---- KPI tiles -------------------------------------------------------------------------- */
+.lms-kpi { background: var(--lms-card); border: 1px solid var(--lms-border); border-radius: var(--lms-radius);
+           box-shadow: var(--lms-shadow); padding: 16px 20px; min-block-size: 96px; }
+.lms-kpi__label { color: var(--lms-text-muted); font-size: 13px; }
+.lms-kpi__value { font-size: 28px; font-weight: 700; line-height: 1.2; font-variant-numeric: tabular-nums; }
+.lms-kpi__hint  { font-size: 12px; color: var(--lms-text-muted); }
+.lms-kpi--ok   { border-inline-start: 4px solid var(--lms-success); }
+.lms-kpi--warn { border-inline-start: 4px solid var(--lms-warning); }
+.lms-kpi--bad  { border-inline-start: 4px solid var(--lms-danger); }
+
+/* ---- status badges: colour AND text, never colour alone ---------------------------------- */
+.lms-badge { display: inline-block; padding: 2px 10px; border-radius: 999px; font-size: 12px; font-weight: 600; border: 1px solid transparent; }
+.lms-badge--ok      { background: #DCFCE7; color: #14532D; border-color: #86EFAC; }
+.lms-badge--info    { background: #DBEAFE; color: #1E3A8A; border-color: #93C5FD; }
+.lms-badge--warn    { background: #FEF3C7; color: #78350F; border-color: #FCD34D; }
+.lms-badge--bad     { background: #FEE2E2; color: #7F1D1D; border-color: #FCA5A5; }
+.lms-badge--neutral { background: #F1F5F9; color: #334155; border-color: var(--lms-border); }
+
+/* ---- progress bar (role=progressbar is set by the template) ------------------------------- */
+.lms-progress { block-size: 8px; background: var(--lms-border); border-radius: 999px; overflow: hidden; }
+.lms-progress > span { display: block; block-size: 100%; background: var(--lms-primary); border-radius: inherit; transition: inline-size .3s ease; }
+.lms-progress--done > span { background: var(--lms-success); }
+
+/* ---- empty / error states ------------------------------------------------------------------ */
+.lms-empty { text-align: center; padding: 48px 16px; color: var(--lms-text-muted); }
+.lms-empty .fa { font-size: 40px; margin-block-end: 12px; opacity: .6; }
+
+/* ---- learning player layout (page 20, page template: Minimal / Left side column) ----------- */
+.lms-player { display: grid; grid-template-columns: 320px 1fr; min-block-size: calc(100vh - 56px); }
+.lms-player__nav { border-inline-end: 1px solid var(--lms-border); background: var(--lms-card); overflow-y: auto; }
+.lms-player__stage { padding: 24px; display: flex; flex-direction: column; gap: var(--lms-gap); }
+.lms-player__viewer { flex: 1; background: var(--lms-card); border: 1px solid var(--lms-border); border-radius: var(--lms-radius); min-block-size: 360px; overflow: hidden; }
+.lms-player__viewer iframe, .lms-player__viewer video { inline-size: 100%; block-size: 100%; min-block-size: 360px; border: 0; background: #000; }
+.lms-player__bar { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; }
+.lms-lesson { display: flex; gap: 10px; align-items: center; padding: 10px 16px; color: var(--lms-text); text-decoration: none; border-block-end: 1px solid var(--lms-border); }
+.lms-lesson[aria-current="true"] { background: #EFF6FF; border-inline-start: 4px solid var(--lms-primary); font-weight: 600; }
+.lms-lesson--locked { color: var(--lms-text-muted); }
+.lms-lesson__state { inline-size: 20px; text-align: center; flex: none; }
+@media (max-width: 900px) {
+  .lms-player { grid-template-columns: 1fr; }
+  .lms-player__nav { border-inline-end: 0; border-block-end: 1px solid var(--lms-border); max-block-size: 40vh; }
+  .lms-player__stage { padding: 12px; }
+}
+
+/* ---- assessment ---------------------------------------------------------------------------- */
+.lms-timer { font-variant-numeric: tabular-nums; font-weight: 700; font-size: 18px; padding: 4px 12px; border-radius: var(--lms-radius-sm); background: #F1F5F9; }
+.lms-timer--warn { background: #FEF3C7; color: #78350F; }
+.lms-timer--bad  { background: #FEE2E2; color: #7F1D1D; }
+.lms-answer { display: flex; gap: 10px; align-items: flex-start; padding: 12px 14px; border: 1px solid var(--lms-border); border-radius: var(--lms-radius-sm); margin-block: 8px; background: var(--lms-card); }
+.lms-answer:focus-within { border-color: var(--lms-primary); }
+.lms-saved { color: var(--lms-text-muted); font-size: 12px; }
+
+/* ---- directional icons mirror in RTL ---------------------------------------------------------- */
+[dir="rtl"] .lms-mirror { transform: scaleX(-1); }
+
+/* ---- public verification page ------------------------------------------------------------------ */
+.lms-verify { max-inline-size: 560px; margin-inline: auto; padding: 32px 16px; }
+.lms-verify__result { border-radius: var(--lms-radius); padding: 20px; border: 1px solid var(--lms-border); background: var(--lms-card); }
+
+/* ---- certificate print ---------------------------------------------------------------------------- */
+@media print {
+  .t-Header, .t-Body-nav, .t-Footer, .lms-noprint { display: none !important; }
+  body { background: #fff; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * { transition: none !important; animation: none !important; scroll-behavior: auto !important; }
+}
+@media (max-width: 640px) {
+  .lms-kpi__value { font-size: 24px; }
+  .lms-card-title { font-size: 15px; }
+}

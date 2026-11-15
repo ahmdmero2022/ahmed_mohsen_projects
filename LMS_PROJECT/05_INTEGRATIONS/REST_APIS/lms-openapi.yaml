@@ -1,0 +1,216 @@
+openapi: 3.0.3
+info:
+  title: LMS Integration API
+  version: 0.1.0
+  description: >
+    REST interface of the enterprise LMS (ORDS on Oracle Database 19c). Hand-written contract that mirrors
+    lms_ords_pkg; ORDS can also generate a description at /ords/lms/open-api-catalog/. Status: specification, not yet
+    validated against a running ORDS instance.
+servers:
+  - url: https://lms.example.invalid/ords/lms
+    description: Replace per environment (always behind the WAF / reverse proxy)
+tags:
+  - name: public
+  - name: catalog
+  - name: hr
+  - name: ops
+paths:
+  /public/certificates/{code}:
+    get:
+      tags: [public]
+      summary: Verify a certificate
+      description: >
+        Unauthenticated. Returns only the title, status, dates and a minimal holder label (policy CERT_VERIFY_NAME:
+        FULL, INITIALS or NONE). Unknown and malformed codes both return 404. Rate limited (policy CERT_VERIFY).
+      parameters:
+        - { name: code, in: path, required: true, schema: { type: string, pattern: '^[A-Za-z0-9]{8,20}$' } }
+      responses:
+        '200':
+          description: Certificate found
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/CertificateVerification' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '429': { $ref: '#/components/responses/RateLimited' }
+        '500': { $ref: '#/components/responses/ServerError' }
+  /catalog/courses:
+    get:
+      tags: [catalog]
+      summary: Search published courses
+      security: [ { oauth2: [ ] } ]
+      parameters:
+        - { name: q, in: query, schema: { type: string, maxLength: 100 }, description: Matches title (EN/AR) or exact course code }
+        - { name: category, in: query, schema: { type: integer } }
+        - { name: limit, in: query, schema: { type: integer, minimum: 1, maximum: 50, default: 20 } }
+        - { name: offset, in: query, schema: { type: integer, minimum: 0, default: 0 } }
+      responses:
+        '200':
+          description: One page of courses
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/CoursePage' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '429': { $ref: '#/components/responses/RateLimited' }
+        '500': { $ref: '#/components/responses/ServerError' }
+  /catalog/courses/{id}:
+    get:
+      tags: [catalog]
+      summary: Published course details
+      security: [ { oauth2: [ ] } ]
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: integer } }
+      responses:
+        '200':
+          description: Course
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/CourseDetail' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '429': { $ref: '#/components/responses/RateLimited' }
+        '500': { $ref: '#/components/responses/ServerError' }
+  /hr/employees:
+    post:
+      tags: [hr]
+      summary: Create or update employees (batch)
+      description: >
+        Idempotent upsert keyed by employee_no. Max 500 per request, rate limited (HR_SYNC, fail closed).
+        Managers listed later in the batch are linked in a second pass. HR status INACTIVE deactivates the user;
+        history is kept.
+      security: [ { oauth2: [ ] } ]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/EmployeeBatch' }
+      responses:
+        '200':
+          description: All employees processed
+          content: { application/json: { schema: { $ref: '#/components/schemas/BatchResult' } } }
+        '207':
+          description: Partial success; failed items are listed
+          content: { application/json: { schema: { $ref: '#/components/schemas/BatchResult' } } }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '429': { $ref: '#/components/responses/RateLimited' }
+        '500': { $ref: '#/components/responses/ServerError' }
+  /ops/health:
+    get:
+      tags: [ops]
+      summary: Health summary for monitoring
+      security: [ { oauth2: [ ] } ]
+      responses:
+        '200':
+          description: ok or degraded
+          content: { application/json: { schema: { $ref: '#/components/schemas/Health' } } }
+        '503':
+          description: Invalid LMS database objects
+          content: { application/json: { schema: { $ref: '#/components/schemas/Health' } } }
+components:
+  securitySchemes:
+    oauth2:
+      type: oauth2
+      flows:
+        clientCredentials:
+          tokenUrl: https://lms.example.invalid/ords/lms/oauth/token
+          scopes: { }
+  responses:
+    BadRequest:   { description: Malformed request, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+    Unauthorized: { description: Missing or invalid token }
+    NotFound:     { description: Not found, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+    RateLimited:
+      description: Too many requests
+      headers:
+        Retry-After: { schema: { type: string }, description: Seconds until the quota window resets }
+      content: { application/json: { schema: { $ref: '#/components/schemas/RateLimitError' } } }
+    ServerError:  { description: Unexpected error (details only in the LMS security log), content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+  schemas:
+    Error:
+      type: object
+      properties: { error: { type: string }, message: { type: string } }
+    RateLimitError:
+      type: object
+      properties: { error: { type: string, example: rate_limited }, retry_after: { type: integer } }
+    LocalizedText:
+      type: object
+      properties: { en: { type: string }, ar: { type: string, nullable: true } }
+    CertificateVerification:
+      type: object
+      properties:
+        valid: { type: boolean }
+        status: { type: string, enum: [VALID, EXPIRED, REVOKED, SUPERSEDED] }
+        title: { $ref: '#/components/schemas/LocalizedText' }
+        issued_on: { type: string, format: date }
+        expires_on: { type: string, format: date, nullable: true }
+        holder: { type: string, nullable: true, description: 'Initials, full name or null per policy' }
+    CourseSummary:
+      type: object
+      properties:
+        id: { type: integer }
+        code: { type: string }
+        title_en: { type: string }
+        title_ar: { type: string, nullable: true }
+        category: { type: string }
+        difficulty: { type: string, enum: [BEGINNER, INTERMEDIATE, ADVANCED] }
+        duration_minutes: { type: integer }
+        language: { type: string }
+        delivery: { type: string, enum: [SELF_PACED, CLASSROOM, VIRTUAL, BLENDED] }
+        rating: { type: number, nullable: true }
+        rating_count: { type: integer }
+    CoursePage:
+      type: object
+      properties:
+        items: { type: array, items: { $ref: '#/components/schemas/CourseSummary' } }
+        limit: { type: integer }
+        offset: { type: integer }
+        has_more: { type: boolean }
+    CourseDetail:
+      allOf:
+        - { $ref: '#/components/schemas/CourseSummary' }
+        - type: object
+          properties:
+            description_en: { type: string, nullable: true }
+            description_ar: { type: string, nullable: true }
+            modules: { type: integer }
+            lessons: { type: integer }
+            certificate: { type: boolean }
+            prerequisites: { type: array, items: { type: string }, description: Course codes }
+    Employee:
+      type: object
+      required: [username, employee_no, name_en, email]
+      properties:
+        username: { type: string, description: 'Matches the SSO subject; stored upper-case' }
+        employee_no: { type: string, maxLength: 30 }
+        name_en: { type: string }
+        name_ar: { type: string, nullable: true }
+        email: { type: string, format: email }
+        department_code: { type: string, nullable: true }
+        position_code: { type: string, nullable: true }
+        manager_employee_no: { type: string, nullable: true }
+        status: { type: string, enum: [ACTIVE, INACTIVE], default: ACTIVE }
+    EmployeeBatch:
+      type: object
+      required: [employees]
+      properties:
+        employees: { type: array, minItems: 1, maxItems: 500, items: { $ref: '#/components/schemas/Employee' } }
+    BatchResult:
+      type: object
+      properties:
+        processed: { type: integer }
+        succeeded: { type: integer }
+        failed: { type: integer }
+        errors:
+          type: array
+          items:
+            type: object
+            properties: { employee_no: { type: string }, error: { type: string } }
+    Health:
+      type: object
+      properties:
+        status: { type: string, enum: [ok, degraded] }
+        invalid_objects: { type: integer }
+        notification_backlog: { type: integer }
+        notification_oldest_minutes: { type: integer }
+        notifications_failed_24h: { type: integer }
+        job_failures_24h: { type: integer }
+        time: { type: string, format: date-time }

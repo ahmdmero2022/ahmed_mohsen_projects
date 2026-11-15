@@ -1,0 +1,73 @@
+key,en,ar
+LMS_ERR_INTERNAL,An unexpected error occurred. Please try again or contact support.,حدث خطأ غير متوقع. يرجى المحاولة مرة أخرى أو التواصل مع الدعم.
+LMS_ERR_RATE_LIMIT,Too many requests. Please wait a moment and try again.,عدد الطلبات كبير. يرجى الانتظار قليلاً ثم المحاولة مرة أخرى.
+LMS_ERR_FORBIDDEN,You are not allowed to perform this action.,غير مسموح لك بتنفيذ هذا الإجراء.
+LMS_ERR_DUPLICATE,This record already exists.,هذا السجل موجود مسبقاً.
+LMS_ERR_RELATED,"The record is referenced by, or refers to, other data.",السجل مرتبط ببيانات أخرى.
+LMS_ERR_INVALID,A value is outside the allowed range.,قيمة خارج النطاق المسموح.
+LMS_JS_SAVED,Saved,تم الحفظ
+LMS_JS_SAVE_FAIL,Could not save your answer.,تعذر حفظ إجابتك.
+LMS_JS_OFFLINE,Connection problem. Your progress will be saved when you are back online.,مشكلة في الاتصال. سيتم حفظ تقدمك عند عودة الاتصال.
+LMS_JS_COMPLETE_FAIL,Could not complete the lesson.,تعذر إكمال الدرس.
+LMS_JS_LESSON_DONE,Lesson completed.,تم إكمال الدرس.
+LMS_JS_TIME_UP,Time is up. Submitting your answers.,انتهى الوقت. جارٍ تسليم إجاباتك.
+LMS_JS_5MIN,5 minutes remaining.,متبقي 5 دقائق.
+LMS_JS_1MIN,1 minute remaining.,متبقي دقيقة واحدة.
+LMS_STATUS_PENDING,Pending approval,بانتظار الموافقة
+LMS_STATUS_APPROVED,Approved,تمت الموافقة
+LMS_STATUS_ENROLLED,Enrolled,مسجّل
+LMS_STATUS_IN_PROGRESS,In progress,قيد التنفيذ
+LMS_STATUS_COMPLETED,Completed,مكتمل
+LMS_STATUS_FAILED,Failed,لم يجتز
+LMS_STATUS_CANCELLED,Cancelled,ملغى
+LMS_STATUS_EXPIRED,Expired,منتهي
+LMS_STATUS_WAITLISTED,Waiting list,قائمة الانتظار
+LMS_STATUS_NOT_STARTED,Not started,لم يبدأ
+LMS_STATUS_DRAFT,Draft,مسودة
+LMS_STATUS_UNDER_REVIEW,Under review,قيد المراجعة
+LMS_STATUS_PUBLISHED,Published,منشور
+LMS_STATUS_SUSPENDED,Suspended,موقوف
+LMS_STATUS_ARCHIVED,Archived,مؤرشف
+LMS_STATUS_VALID,Valid,ساري
+LMS_STATUS_REVOKED,Revoked,ملغاة
+LMS_STATUS_SUPERSEDED,Superseded,مستبدلة
+LMS_STATUS_REGISTERED,Registered,مسجّل
+LMS_STATUS_PENDING_GRADING,Awaiting grading,بانتظار التصحيح
+LMS_STATUS_GRADED,Graded,تم التصحيح
+LMS_DIFF_BEGINNER,Beginner,مبتدئ
+LMS_DIFF_INTERMEDIATE,Intermediate,متوسط
+LMS_DIFF_ADVANCED,Advanced,متقدم
+LMS_DELIVERY_SELF_PACED,Self-paced,ذاتي
+LMS_DELIVERY_CLASSROOM,Classroom,حضوري
+LMS_DELIVERY_VIRTUAL,Virtual,افتراضي
+LMS_DELIVERY_BLENDED,Blended,مدمج
+LMS_RULE_LESSONS,All required lessons,جميع الدروس المطلوبة
+LMS_RULE_LESSONS_ASSESSMENT,Lessons and passing the assessment,الدروس واجتياز الاختبار
+LMS_RULE_ATTENDANCE,Session attendance,حضور الجلسات
+LMS_RULE_LESSONS_ATTENDANCE,Lessons and attendance,الدروس والحضور
+LMS_RULE_INSTRUCTOR_APPROVAL,Lessons and instructor approval,الدروس وموافقة المدرب
+LMS_LESSON_VIDEO,Video,فيديو
+LMS_LESSON_PDF,PDF document,مستند PDF
+LMS_LESSON_PRESENTATION,Presentation,عرض تقديمي
+LMS_LESSON_TEXT,Text,نص
+LMS_LESSON_HTML,Formatted text,نص منسق
+LMS_LESSON_URL,External link,رابط خارجي
+LMS_LESSON_DOWNLOAD,Download,ملف للتنزيل
+LMS_LESSON_INTERACTIVE,Interactive content,محتوى تفاعلي
+LMS_LESSON_ASSESSMENT,Assessment,اختبار
+LMS_LESSON_ASSIGNMENT,Assignment,واجب
+LMS_LESSON_LIVE_SESSION,Live session,جلسة مباشرة
+LMS_QTYPE_MCQ,Multiple choice,اختيار من متعدد
+LMS_QTYPE_MULTI,Multiple answers,إجابات متعددة
+LMS_QTYPE_TF,True / False,صح / خطأ
+LMS_QTYPE_MATCH,Matching,مطابقة
+LMS_QTYPE_SHORT,Short answer,إجابة قصيرة
+LMS_QTYPE_ESSAY,Essay,مقالي
+LMS_NO_COURSES,No courses match your search.,لا توجد دورات مطابقة لبحثك.
+LMS_NO_LEARNING,You have no courses yet. Browse the catalog to get started.,لا توجد لديك دورات بعد. تصفح الكتالوج للبدء.
+LMS_NO_CERTS,You have no certificates yet.,لا توجد لديك شهادات بعد.
+LMS_THROTTLED,You are searching very quickly. Results will be available again in a moment.,البحث سريع جداً. ستتوفر النتائج بعد لحظات.
+LMS_CONFIRM_SUBMIT,Submit your answers? You cannot change them afterwards.,تسليم الإجابات؟ لا يمكنك تعديلها بعد ذلك.
+LMS_CONFIRM_CANCEL_ENR,Cancel this enrolment?,إلغاء هذا التسجيل؟
+LMS_VERIFY_VALID,This certificate is valid.,هذه الشهادة سارية.
+LMS_VERIFY_INVALID,No valid certificate was found for this code.,لم يتم العثور على شهادة صالحة لهذا الرمز.
