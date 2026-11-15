@@ -1108,10 +1108,12 @@ CREATE OR REPLACE PACKAGE BODY lms_session_pkg AS
   BEGIN
     INSERT INTO lms_notification_queue (user_id, template_code, payload)
     SELECT se.user_id, p_template,
-           JSON_OBJECT('course' VALUE c.title_en, 'start' VALUE TO_CHAR(s.start_ts, 'YYYY-MM-DD HH24:MI TZR'))
+           JSON_OBJECT('course' VALUE c.title_en, 'start' VALUE TO_CHAR(s.start_ts, 'YYYY-MM-DD HH24:MI TZR'),
+                       'where' VALUE NVL(v.name_en, 'Online'))
       FROM lms_session_enrollments se
       JOIN lms_training_sessions s ON s.session_id = se.session_id
       JOIN lms_courses c ON c.course_id = s.course_id
+      LEFT JOIN lms_venues v ON v.venue_id = s.venue_id
      WHERE se.session_id = p_session_id AND se.status IN ('REGISTERED','WAITLISTED');
   END notify_participants;
 
@@ -1334,7 +1336,8 @@ CREATE OR REPLACE PACKAGE BODY lms_session_pkg AS
     IF has_conflict(l_s.venue_id, l_s.instructor_id, p_start_ts, p_end_ts, p_session_id) THEN
       RAISE_APPLICATION_ERROR(-20409, 'Venue or instructor is already booked in that period');
     END IF;
-    UPDATE lms_training_sessions SET start_ts = p_start_ts, end_ts = p_end_ts WHERE session_id = p_session_id;
+    UPDATE lms_training_sessions SET start_ts = p_start_ts, end_ts = p_end_ts, instructor_reminded_at = NULL WHERE session_id = p_session_id;
+    UPDATE lms_session_enrollments SET reminded_long_at = NULL, reminded_short_at = NULL WHERE session_id = p_session_id;   -- new time, new reminders
     notify_participants(p_session_id, 'SESSION_RESCHEDULED');
     lms_audit_pkg.log_event('SESSION_RESCHEDULE', 'SESSION', p_session_id);
   END reschedule;
@@ -1365,5 +1368,186 @@ CREATE OR REPLACE PACKAGE BODY lms_session_pkg AS
     lms_audit_pkg.log_event('ATTENDANCE', 'SESSION_ENROLLMENT', p_session_enrollment_id);
     lms_progress_pkg.evaluate_completion(l_se.enrollment_id);
   END record_attendance;
+  -- ------------------------------------------------------------------ edit / complete -----
+  PROCEDURE update_session(p_session_id IN NUMBER, p_venue_id IN NUMBER, p_instructor_id IN NUMBER, p_seats IN NUMBER,
+                           p_meeting_url IN VARCHAR2, p_min_attendance_pct IN NUMBER) IS
+    l_s lms_training_sessions%ROWTYPE;
+    l_registered NUMBER; l_att NUMBER; l_cap NUMBER; l_act CHAR(1); l_ist lms_users.status%TYPE;
+    l_changed BOOLEAN;
+  BEGIN
+    BEGIN SELECT * INTO l_s FROM lms_training_sessions WHERE session_id = p_session_id FOR UPDATE;
+    EXCEPTION WHEN NO_DATA_FOUND THEN RAISE_APPLICATION_ERROR(-20404, 'Session not found'); END;
+    lms_security_pkg.require_permission('SESSION_MANAGE');
+    IF NOT lms_course_pkg.can_manage_course(l_s.course_id, 'SESSION_MANAGE') THEN
+      lms_audit_pkg.log_event('ACCESS_DENIED', 'SESSION', p_session_id, 'DENIED');
+      RAISE_APPLICATION_ERROR(-20403, 'Not authorized');
+    END IF;
+    IF l_s.status NOT IN ('SCHEDULED','PUBLISHED') OR l_s.start_ts <= SYSTIMESTAMP THEN
+      RAISE_APPLICATION_ERROR(-20409, 'Only upcoming sessions can be edited');
+    END IF;
+    IF p_seats IS NULL OR p_seats <= 0 OR p_seats <> TRUNC(p_seats) THEN RAISE_APPLICATION_ERROR(-20400, 'Seats must be a positive whole number'); END IF;
+    IF p_venue_id IS NULL AND p_meeting_url IS NULL THEN RAISE_APPLICATION_ERROR(-20400, 'A venue or a meeting link is required'); END IF;
+    IF p_meeting_url IS NOT NULL AND NOT REGEXP_LIKE(p_meeting_url, '^https://[^[:space:]]{1,980}$', 'i') THEN
+      RAISE_APPLICATION_ERROR(-20400, 'The meeting link must start with https://');
+    END IF;
+    IF p_min_attendance_pct IS NULL OR p_min_attendance_pct NOT BETWEEN 0 AND 100 THEN
+      RAISE_APPLICATION_ERROR(-20400, 'Minimum attendance must be between 0 and 100');
+    END IF;
+
+    IF p_venue_id IS NOT NULL THEN
+      BEGIN SELECT capacity, active_flag INTO l_cap, l_act FROM lms_venues WHERE venue_id = p_venue_id;
+      EXCEPTION WHEN NO_DATA_FOUND THEN RAISE_APPLICATION_ERROR(-20404, 'Venue not found'); END;
+      IF l_act <> 'Y' AND NVL(l_s.venue_id, -1) <> p_venue_id THEN RAISE_APPLICATION_ERROR(-20409, 'The venue is inactive'); END IF;
+      IF l_cap IS NOT NULL AND p_seats > l_cap THEN
+        RAISE_APPLICATION_ERROR(-20400, 'Seats (' || p_seats || ') exceed the venue capacity (' || l_cap || ')');
+      END IF;
+    END IF;
+    IF p_instructor_id <> l_s.instructor_id THEN
+      BEGIN SELECT status INTO l_ist FROM lms_users WHERE user_id = p_instructor_id;
+      EXCEPTION WHEN NO_DATA_FOUND THEN RAISE_APPLICATION_ERROR(-20404, 'Instructor not found'); END;
+      IF l_ist <> 'ACTIVE' THEN RAISE_APPLICATION_ERROR(-20409, 'Instructor is not active'); END IF;
+    END IF;
+    IF (NVL(p_venue_id, -1) <> NVL(l_s.venue_id, -1) OR p_instructor_id <> l_s.instructor_id)
+       AND has_conflict(p_venue_id, p_instructor_id, l_s.start_ts, l_s.end_ts, p_session_id) THEN
+      RAISE_APPLICATION_ERROR(-20409, 'Venue or instructor is already booked in that period');
+    END IF;
+
+    SELECT COUNT(*) INTO l_registered FROM lms_session_enrollments WHERE session_id = p_session_id AND status = 'REGISTERED';
+    IF p_seats < l_registered THEN
+      RAISE_APPLICATION_ERROR(-20409, 'Seats cannot be lower than the ' || l_registered || ' registered learners. Cancel registrations first.');
+    END IF;
+    IF p_min_attendance_pct <> l_s.min_attendance_pct THEN
+      SELECT COUNT(*) INTO l_att FROM lms_attendance a JOIN lms_session_enrollments se ON se.session_enrollment_id = a.session_enrollment_id
+       WHERE se.session_id = p_session_id AND ROWNUM = 1;
+      IF l_att > 0 THEN RAISE_APPLICATION_ERROR(-20409, 'The attendance threshold cannot change after attendance was recorded'); END IF;
+    END IF;
+
+    l_changed := NVL(p_venue_id, -1) <> NVL(l_s.venue_id, -1) OR NVL(p_meeting_url, '~') <> NVL(l_s.meeting_url, '~')
+                 OR p_instructor_id <> l_s.instructor_id;
+    UPDATE lms_training_sessions
+       SET venue_id = p_venue_id, instructor_id = p_instructor_id, seats = p_seats, meeting_url = p_meeting_url,
+           min_attendance_pct = p_min_attendance_pct,
+           instructor_reminded_at = CASE WHEN p_instructor_id <> l_s.instructor_id THEN NULL ELSE instructor_reminded_at END
+     WHERE session_id = p_session_id;
+    IF p_seats > l_s.seats THEN promote_session_waitlist(p_session_id); END IF;
+    IF l_changed THEN
+      notify_participants(p_session_id, 'SESSION_CHANGED');
+      IF p_instructor_id <> l_s.instructor_id THEN
+        lms_notification_pkg.enqueue(p_instructor_id, 'SESSION_ASSIGNED',
+          lms_util_pkg.js('start', TO_CHAR(l_s.start_ts, 'YYYY-MM-DD HH24:MI TZR')));
+      END IF;
+    END IF;
+    lms_audit_pkg.log_event('SESSION_UPDATE', 'SESSION', p_session_id, 'SUCCESS',
+      lms_util_pkg.js('seats', p_seats, 'venue', NVL(TO_CHAR(p_venue_id), 'NONE'), 'trainer_changed', CASE WHEN p_instructor_id <> l_s.instructor_id THEN 'Y' ELSE 'N' END));
+  END update_session;
+
+  -- Marks the session COMPLETED and lets the attendance rule decide course completion. Caller holds the session lock.
+  PROCEDURE finish_session(p_session_id IN NUMBER) IS
+  BEGIN
+    UPDATE lms_training_sessions SET status = 'COMPLETED' WHERE session_id = p_session_id AND status = 'PUBLISHED';
+    FOR r IN (SELECT enrollment_id FROM lms_session_enrollments WHERE session_id = p_session_id AND status = 'REGISTERED') LOOP
+      lms_progress_pkg.evaluate_completion(r.enrollment_id);
+    END LOOP;
+    lms_audit_pkg.log_event('SESSION_COMPLETE', 'SESSION', p_session_id);
+  END finish_session;
+
+  PROCEDURE complete_session(p_session_id IN NUMBER) IS
+    l_s lms_training_sessions%ROWTYPE;
+  BEGIN
+    BEGIN SELECT * INTO l_s FROM lms_training_sessions WHERE session_id = p_session_id FOR UPDATE;
+    EXCEPTION WHEN NO_DATA_FOUND THEN RAISE_APPLICATION_ERROR(-20404, 'Session not found'); END;
+    lms_security_pkg.require_permission('SESSION_MANAGE');
+    IF NOT lms_course_pkg.can_manage_course(l_s.course_id, 'SESSION_MANAGE') THEN
+      lms_audit_pkg.log_event('ACCESS_DENIED', 'SESSION', p_session_id, 'DENIED');
+      RAISE_APPLICATION_ERROR(-20403, 'Not authorized');
+    END IF;
+    IF l_s.status <> 'PUBLISHED' THEN RAISE_APPLICATION_ERROR(-20409, 'Only PUBLISHED sessions can be completed'); END IF;
+    IF l_s.end_ts > SYSTIMESTAMP THEN RAISE_APPLICATION_ERROR(-20409, 'The session has not ended yet'); END IF;
+    finish_session(p_session_id);
+  END complete_session;
+
+  FUNCTION close_finished_sessions RETURN NUMBER IS
+    l_days NUMBER := lms_util_pkg.get_number('SESSION_AUTOCLOSE_DAYS', 7);
+    l_n NUMBER := 0;
+    CURSOR c IS
+      SELECT session_id FROM lms_training_sessions
+       WHERE status = 'PUBLISHED' AND end_ts < SYSTIMESTAMP - NUMTODSINTERVAL(l_days, 'DAY')
+         FOR UPDATE SKIP LOCKED;
+  BEGIN
+    IF l_days <= 0 THEN RETURN 0; END IF;
+    FOR r IN c LOOP
+      finish_session(r.session_id);
+      l_n := l_n + 1;
+    END LOOP;
+    RETURN l_n;
+  END close_finished_sessions;
+
+  -- --------------------------------------------------------------------- reminders (JOB) -----
+  FUNCTION send_reminders RETURN NUMBER IS
+    l_long  NUMBER := lms_util_pkg.get_number('SESSION_REMINDER_LONG_HOURS', 24);
+    l_short NUMBER := lms_util_pkg.get_number('SESSION_REMINDER_SHORT_HOURS', 1);
+    l_n NUMBER := 0;
+
+    -- "where": venue name, plus the join link for blended/virtual sessions. Registered learners only, so the link is safe to send.
+    CURSOR c_long IS
+      SELECT se.user_id, c.title_en, s.start_ts,
+             CASE WHEN v.name_en IS NOT NULL THEN v.name_en || CASE WHEN s.meeting_url IS NOT NULL THEN ' / ' || s.meeting_url END
+                  ELSE s.meeting_url END AS where_text
+        FROM lms_session_enrollments se
+        JOIN lms_training_sessions s ON s.session_id = se.session_id AND s.status = 'PUBLISHED'
+        JOIN lms_courses c ON c.course_id = s.course_id
+        JOIN lms_users u ON u.user_id = se.user_id AND u.status = 'ACTIVE'
+        LEFT JOIN lms_venues v ON v.venue_id = s.venue_id
+       WHERE se.status = 'REGISTERED' AND se.reminded_long_at IS NULL AND l_long > 0
+         AND s.start_ts <= SYSTIMESTAMP + NUMTODSINTERVAL(l_long, 'HOUR')
+         AND s.start_ts >  SYSTIMESTAMP + NUMTODSINTERVAL(l_short, 'HOUR') + INTERVAL '30' MINUTE
+         AND se.registered_at <= SYSTIMESTAMP - INTERVAL '3' HOUR          -- no reminder right after registering
+         FOR UPDATE OF se.reminded_long_at SKIP LOCKED;
+    CURSOR c_short IS
+      SELECT se.user_id, c.title_en, s.start_ts,
+             CASE WHEN v.name_en IS NOT NULL THEN v.name_en || CASE WHEN s.meeting_url IS NOT NULL THEN ' / ' || s.meeting_url END
+                  ELSE s.meeting_url END AS where_text
+        FROM lms_session_enrollments se
+        JOIN lms_training_sessions s ON s.session_id = se.session_id AND s.status = 'PUBLISHED'
+        JOIN lms_courses c ON c.course_id = s.course_id
+        JOIN lms_users u ON u.user_id = se.user_id AND u.status = 'ACTIVE'
+        LEFT JOIN lms_venues v ON v.venue_id = s.venue_id
+       WHERE se.status = 'REGISTERED' AND se.reminded_short_at IS NULL AND l_short > 0
+         AND s.start_ts <= SYSTIMESTAMP + NUMTODSINTERVAL(l_short, 'HOUR') AND s.start_ts > SYSTIMESTAMP
+         FOR UPDATE OF se.reminded_short_at SKIP LOCKED;
+    CURSOR c_inst IS
+      SELECT s.session_id, s.instructor_id, c.title_en, s.start_ts,
+             (SELECT COUNT(*) FROM lms_session_enrollments x WHERE x.session_id = s.session_id AND x.status = 'REGISTERED') AS registered
+        FROM lms_training_sessions s
+        JOIN lms_courses c ON c.course_id = s.course_id
+        JOIN lms_users u ON u.user_id = s.instructor_id AND u.status = 'ACTIVE'
+       WHERE s.status = 'PUBLISHED' AND s.instructor_reminded_at IS NULL AND l_long > 0
+         AND s.start_ts <= SYSTIMESTAMP + NUMTODSINTERVAL(l_long, 'HOUR') AND s.start_ts > SYSTIMESTAMP
+         FOR UPDATE OF s.instructor_reminded_at SKIP LOCKED;
+  BEGIN
+    FOR r IN c_long LOOP
+      lms_notification_pkg.enqueue(r.user_id, 'SESSION_REMINDER', lms_util_pkg.js('course', r.title_en,
+        'start', TO_CHAR(r.start_ts, 'YYYY-MM-DD HH24:MI TZR'), 'where', NVL(r.where_text, '-')));
+      UPDATE lms_session_enrollments SET reminded_long_at = SYSTIMESTAMP WHERE CURRENT OF c_long;
+      l_n := l_n + 1;
+    END LOOP;
+    FOR r IN c_short LOOP
+      lms_notification_pkg.enqueue(r.user_id, 'SESSION_REMINDER', lms_util_pkg.js('course', r.title_en,
+        'start', TO_CHAR(r.start_ts, 'YYYY-MM-DD HH24:MI TZR'), 'where', NVL(r.where_text, '-')));
+      UPDATE lms_session_enrollments SET reminded_short_at = SYSTIMESTAMP, reminded_long_at = NVL(reminded_long_at, SYSTIMESTAMP)
+       WHERE CURRENT OF c_short;                       -- a learner who gets the short one never gets a late long one
+      l_n := l_n + 1;
+    END LOOP;
+    FOR r IN c_inst LOOP
+      lms_notification_pkg.enqueue(r.instructor_id, 'SESSION_INSTRUCTOR_REMINDER', lms_util_pkg.js('course', r.title_en,
+        'start', TO_CHAR(r.start_ts, 'YYYY-MM-DD HH24:MI TZR'), 'registered', r.registered));
+      UPDATE lms_training_sessions SET instructor_reminded_at = SYSTIMESTAMP WHERE CURRENT OF c_inst;
+      l_n := l_n + 1;
+    END LOOP;
+    IF l_n > 0 THEN
+      lms_audit_pkg.log_event('SESSION_REMINDERS', 'SESSION', NULL, 'SUCCESS', lms_util_pkg.js('queued', l_n));
+    END IF;
+    RETURN l_n;
+  END send_reminders;
 END lms_session_pkg;
 /

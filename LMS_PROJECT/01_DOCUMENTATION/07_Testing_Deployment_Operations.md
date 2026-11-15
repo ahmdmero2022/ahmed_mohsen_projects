@@ -140,6 +140,7 @@ Concurrency script sketch (SQL*Plus/`DBMS_SCHEDULER`): spawn N jobs each calling
 - `02_DATABASE/11_validation.sql` (not yet run): object validity, FK indexes, answer-key exposure (S-14 partial), seeds, jobs.
 - `06_TESTING/UNIT_TESTS/skills_feedback_tests.sql` (not yet run): 42 assertions for skills and feedback (authorization, duplicates, immutability, completion skill credit, review policy, anonymity threshold).
 - `06_TESTING/UNIT_TESTS/venues_reminders_tests.sql` (not yet run): 26 assertions for venue rules and feedback reminders (window, idempotency, policy switch, inactive users).
+- `06_TESTING/UNIT_TESTS/session_edit_reminders_tests.sql` (not yet run): session editing rules, reminder windows, idempotency, reschedule reset, waiting-list exclusion, completion and auto-close.
 - Authorization checks S-08/S-09 can be scripted in SQL by creating an APEX session as `TD_LEARNER1` (`apex_session.create_session`) and calling `lms_enrollment_pkg.assign` / `lms_admin_pkg.set_setting`; expected `ORA-20403`.
 
 ## 6. UAT scenarios (summary)

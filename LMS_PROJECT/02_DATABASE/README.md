@@ -25,7 +25,7 @@ member has a body; the validation script's table list equals the DDL. **Not run:
 | `15_views_apex.sql` | 46 views behind the APEX pages: learner, approvals, authoring, administration, monitoring, analytics |
 | `16_views_lov.sql` | 30 lookup, detail, maintenance, skills and feedback views (LOVs, course outline, prerequisites, instructors, popularity, admin lists, anonymised feedback analytics) |
 
-Counts: 56 tables, 92 views, 22 packages (161 public members), 8 application scheduler jobs (+ the rate-limit purge), 10 rate-limit policies, 24 bilingual notification templates.
+Counts: 56 tables, 92 views, 22 packages (165 public members), 10 application scheduler jobs (+ the rate-limit purge), 10 rate-limit policies, 28 bilingual notification templates.
 
 ## Prerequisites
 - Schema owner privileges: `CREATE SESSION/TABLE/VIEW/SEQUENCE/PROCEDURE/JOB`, tablespace quota; **no DBA role**.
@@ -69,3 +69,13 @@ Tests: `06_TESTING/UNIT_TESTS/skills_feedback_tests.sql` (impersonates `TD_*` us
 | `LMS_SESSION_PKG` | `create_session` (extended) | refuses inactive venues and seats above the venue capacity |
 | `LMS_FEEDBACK_PKG` | `send_reminders` (JOB `LMS_FEEDBACK_JOB`, daily 09:25) | one reminder per completed enrolment, `FEEDBACK_REMINDER_DAYS` (3; 0 = off) after completion and within `FEEDBACK_REMINDER_WINDOW_DAYS` (30); only while a review or a questionnaire answer is missing; active learners only; marker `LMS_ENROLLMENTS.FEEDBACK_REMINDED_AT` guarantees it is never sent twice; locks rows with `SKIP LOCKED` so overlapping runs cannot double-send |
 Schema changes: `LMS_ENROLLMENTS.FEEDBACK_REMINDED_AT`, index `LMS_ENR_DONE_IX (STATUS, COMPLETED_AT)`, check `LMS_VEN_CAP_CK`. Tests: `06_TESTING/UNIT_TESTS/venues_reminders_tests.sql`.
+
+## Session editing, completion and reminders (latest addition)
+| Procedure (`LMS_SESSION_PKG`) | Rules |
+|---|---|
+| `update_session` | permission `SESSION_MANAGE` + course scope; upcoming (SCHEDULED/PUBLISHED, not started) sessions only; seats ≥ registered learners, ≤ venue capacity; venue active; https-only link; venue or link required; no venue/trainer double booking; attendance threshold locked once attendance exists; more seats promote the waiting list; place/link/trainer change notifies registered + waiting learners (`SESSION_CHANGED`) and the new trainer (`SESSION_ASSIGNED`) |
+| `complete_session` | PUBLISHED and ended; sets COMPLETED and re-evaluates course completion for each registered learner (attendance rule) |
+| `close_finished_sessions` (JOB `LMS_SESSION_CLOSE_JOB`, 03:10) | auto-completes sessions that ended more than `SESSION_AUTOCLOSE_DAYS` (7; 0 = off) ago |
+| `send_reminders` (JOB `LMS_SESSION_REMINDER_JOB`, every 15 min) | REGISTERED learners only (never the waiting list): `SESSION_REMINDER_LONG_HOURS` (24) and `SESSION_REMINDER_SHORT_HOURS` (1) before the start, each once per registration; no long reminder within 3 h of registering; a short reminder suppresses a late long one; trainer reminded once at the long mark; `reschedule` and a trainer change reset the markers; rows locked with `SKIP LOCKED` |
+Schema: `LMS_SESSION_ENROLLMENTS.REMINDED_LONG_AT/REMINDED_SHORT_AT`, `LMS_TRAINING_SESSIONS.INSTRUCTOR_REMINDED_AT`. New templates: `SESSION_REMINDER`, `SESSION_INSTRUCTOR_REMINDER`, `SESSION_CHANGED`, `SESSION_ASSIGNED`. Tests: `06_TESTING/UNIT_TESTS/session_edit_reminders_tests.sql`.
+Known limits: reminders are sent in the session's stored time zone label (`TZR`), not converted to each learner's zone; the join link is included in e-mail text for registered learners only; no ICS attachment.

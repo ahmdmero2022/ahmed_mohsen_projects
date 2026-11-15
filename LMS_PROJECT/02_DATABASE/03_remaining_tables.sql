@@ -332,6 +332,7 @@ CREATE TABLE lms_training_sessions (
   meeting_url    VARCHAR2(1000),
   status         VARCHAR2(10) DEFAULT 'SCHEDULED' NOT NULL,
   min_attendance_pct NUMBER(5,2) DEFAULT 80 NOT NULL,
+  instructor_reminded_at TIMESTAMP WITH TIME ZONE,       -- one reminder to the trainer; cleared on reschedule/trainer change
   created_by     NUMBER NOT NULL,
   CONSTRAINT lms_ts_course_fk FOREIGN KEY (course_id) REFERENCES lms_courses (course_id),
   CONSTRAINT lms_ts_venue_fk FOREIGN KEY (venue_id) REFERENCES lms_venues (venue_id),
@@ -356,6 +357,8 @@ CREATE TABLE lms_session_enrollments (
   enrollment_id  NUMBER NOT NULL,
   status         VARCHAR2(12) DEFAULT 'REGISTERED' NOT NULL,
   registered_at  TIMESTAMP WITH TIME ZONE DEFAULT SYSTIMESTAMP NOT NULL,
+  reminded_long_at  TIMESTAMP WITH TIME ZONE,            -- 'starts within N hours' reminder sent
+  reminded_short_at TIMESTAMP WITH TIME ZONE,            -- 'starts soon' reminder sent
   CONSTRAINT lms_se_sess_fk FOREIGN KEY (session_id) REFERENCES lms_training_sessions (session_id),
   CONSTRAINT lms_se_user_fk FOREIGN KEY (user_id) REFERENCES lms_users (user_id),
   CONSTRAINT lms_se_enr_fk FOREIGN KEY (enrollment_id) REFERENCES lms_enrollments (enrollment_id),

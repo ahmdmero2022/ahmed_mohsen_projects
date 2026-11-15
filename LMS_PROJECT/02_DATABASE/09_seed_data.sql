@@ -118,7 +118,10 @@ USING (SELECT 'RETAIN_AUDIT_DAYS' k, '2555' v, 'Audit log retention (days)' d FR
        SELECT 'FEEDBACK_MIN_RESPONSES', '5', 'Minimum responses before course feedback is shown to instructors (anonymity)' FROM dual UNION ALL
        SELECT 'REVIEW_EDIT_DAYS', '0', 'Days a learner may edit a review (0 = reviews are final)' FROM dual UNION ALL
        SELECT 'FEEDBACK_REMINDER_DAYS', '3', 'Days after completion to remind a learner to give feedback (0 = off)' FROM dual UNION ALL
-       SELECT 'FEEDBACK_REMINDER_WINDOW_DAYS', '30', 'Do not remind for completions older than this many days' FROM dual) s
+       SELECT 'FEEDBACK_REMINDER_WINDOW_DAYS', '30', 'Do not remind for completions older than this many days' FROM dual UNION ALL
+       SELECT 'SESSION_REMINDER_LONG_HOURS', '24', 'First session reminder this many hours before the start (0 = off)' FROM dual UNION ALL
+       SELECT 'SESSION_REMINDER_SHORT_HOURS', '1', 'Second session reminder this many hours before the start (0 = off)' FROM dual UNION ALL
+       SELECT 'SESSION_AUTOCLOSE_DAYS', '7', 'Complete PUBLISHED sessions this many days after they ended (0 = off)' FROM dual) s
    ON (t.setting_key = s.k)
  WHEN NOT MATCHED THEN INSERT (setting_key, setting_value, description) VALUES (s.k, s.v, s.d);
 
@@ -213,6 +216,14 @@ BEGIN
     'انتهت صلاحية الشهادة: {{title}}', 'انتهت صلاحية شهادتك "{{title}}".');
   t('FEEDBACK_REMINDER', 'How was "{{course}}"?', 'You completed "{{course}}". Please take a minute to rate it and tell us what could be better.',
     'ما رأيك في "{{course}}"؟', 'لقد أكملت دورة "{{course}}". نرجو أن تقيّمها وتخبرنا بما يمكن تحسينه، فذلك لا يستغرق سوى دقيقة.');
+  t('SESSION_REMINDER', 'Reminder: {{course}} starts {{start}}', 'Your session of "{{course}}" starts {{start}}. Where: {{where}}.',
+    'تذكير: تبدأ جلسة {{course}} في {{start}}', 'تبدأ جلسة "{{course}}" في {{start}}. المكان: {{where}}.');
+  t('SESSION_INSTRUCTOR_REMINDER', 'You teach {{course}} on {{start}}', 'You are the trainer for "{{course}}" starting {{start}}. Registered learners: {{registered}}.',
+    'ستقدّم دورة {{course}} في {{start}}', 'أنت المدرّب لجلسة "{{course}}" التي تبدأ في {{start}}. عدد المسجلين: {{registered}}.');
+  t('SESSION_CHANGED', 'Session details changed: {{course}}', 'The place, link or trainer of the "{{course}}" session on {{start}} changed. Where: {{where}}.',
+    'تغيّرت تفاصيل الجلسة: {{course}}', 'تغيّر المكان أو الرابط أو المدرّب لجلسة "{{course}}" بتاريخ {{start}}. المكان: {{where}}.');
+  t('SESSION_ASSIGNED', 'You were assigned a session', 'You were assigned as the trainer of a session starting {{start}}.',
+    'تم تكليفك بجلسة', 'تم تكليفك كمدرّب لجلسة تبدأ في {{start}}.');
   t('CERT_REVOKED', 'Certificate revoked: {{title}}', 'Your certificate "{{title}}" was revoked.',
     'تم إلغاء الشهادة: {{title}}', 'تم إلغاء شهادتك "{{title}}".');
 END;
@@ -238,6 +249,8 @@ BEGIN
   j('LMS_REMINDER_JOB',     'BEGIN lms_reporting_pkg.send_reminders; END;', 'FREQ=DAILY;BYHOUR=6;BYMINUTE=15');
   j('LMS_APPROVAL_ESC_JOB', 'BEGIN lms_approval_pkg.escalate_overdue; END;', 'FREQ=DAILY;BYHOUR=7;BYMINUTE=5');
   j('LMS_FEEDBACK_JOB',     'DECLARE n NUMBER; BEGIN n := lms_feedback_pkg.send_reminders; END;', 'FREQ=DAILY;BYHOUR=9;BYMINUTE=25');
+  j('LMS_SESSION_REMINDER_JOB', 'DECLARE n NUMBER; BEGIN n := lms_session_pkg.send_reminders; END;', 'FREQ=MINUTELY;INTERVAL=15');
+  j('LMS_SESSION_CLOSE_JOB', 'DECLARE n NUMBER; BEGIN n := lms_session_pkg.close_finished_sessions; END;', 'FREQ=DAILY;BYHOUR=3;BYMINUTE=10');
 END;
 /
 COMMIT;

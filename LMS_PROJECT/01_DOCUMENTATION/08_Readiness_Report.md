@@ -6,7 +6,7 @@
 |---|---|---|
 | Documents 01–07 | Written | Files in this repo |
 | Mermaid diagrams | **Unverified** | Not rendered; syntax reviewed by eye only |
-| `02_DATABASE/*.sql` (16 scripts, 56 tables, 92 views, 22 packages, 161 public members) | **Unverified on Oracle** | Not run or compiled. Static checks run: SQL parser on all DDL/views, name uniqueness, FK order, package call/spec/body consistency, validation list = DDL (see `02_DATABASE/README.md`) |
+| `02_DATABASE/*.sql` (16 scripts, 56 tables, 92 views, 22 packages, 165 public members) | **Unverified on Oracle** | Not run or compiled. Static checks run: SQL parser on all DDL/views, name uniqueness, FK order, package call/spec/body consistency, validation list = DDL (see `02_DATABASE/README.md`) |
 | `05_INTEGRATIONS/` ORDS modules, OpenAPI, smoke test | **Unverified** | ORDS API calls not executed; YAML parses; `bash -n` passes on the test script |
 | `03_APEX/` page specifications, shared components, static files | **Specification** | No APEX export; `player.js`/`assessment.js` pass `node --check` but were not run in a browser; CSS not rendered |
 | APEX export | **Not produced** | Page specs only |
@@ -56,7 +56,7 @@ Open items:
 | 3 | Run the ORDS scripts, confirm API behaviour (`:status_code`, `Retry-After` header parameter, OAuth client creation/rotation), run `ords_smoke_test.sh`; configure the WAF for the chosen product | §15 |
 | 4 | Content platform integration: pre-signed upload, signing-key provisioning (`LMS_SECRET_PKG` body per environment), virus scan hook | §5 M4, §14 |
 | 5 | ~~Skills administration~~ — **done** (`save_skill`, `remove_skill`, `set_position_skill`, `set_course_skill`, `copy_position_skills`); remaining: bulk import of skill requirements from the HR system, competency *framework* grouping beyond the `skill_group` text | §5 M11 |
-| 6 | ~~Feedback questionnaire authoring~~ — **done** (forms, questions, assignment, clone, review editing policy, anonymity threshold); venue maintenance and the daily feedback reminder are now done; remaining: session-start reminders (24 h / 1 h before) and a second feedback nudge | §5 M9, M12, M13 |
+| 6 | ~~Feedback questionnaire authoring~~ — **done** (forms, questions, assignment, clone, review editing policy, anonymity threshold); venue maintenance and the daily feedback reminder are now done; remaining: a second feedback nudge, reminder e-mails carrying a calendar invite (ICS), and per-user reminder preferences | §5 M9, M12, M13 |
 | 7 | Skills history table if a skills *trend* is required (dashboard currently shows current gap index only) | §12.14 |
 | 8 | JMeter/k6 scripts and data generators for 5k courses / 100k enrolments / 1M activity rows | §19 |
 | 9 | Arabic UI/notification text review by a native speaker; XLIFF translation of page text | §2 |
@@ -64,7 +64,7 @@ Open items:
 | 11 | Per-release reverse-migration scripts (the supplied rollback is a full drop) | §22 |
 | 12 | Business decisions: OQ-10 (may executives see individual learners?), quiz-exhaustion policy, executive role definition | doc 06 |
 
-Closed in the latest revision: venue maintenance (`save_venue`, `remove_venue`, capacity/active checks in `create_session`), feedback reminders (`LMS_FEEDBACK_PKG.SEND_REMINDERS`, job `LMS_FEEDBACK_JOB`), `06_TESTING/UNIT_TESTS/venues_reminders_tests.sql` (26 assertions, not executed). Before that: skills framework maintenance (`LMS_SKILL_PKG`), feedback questionnaire authoring and review policy (`LMS_FEEDBACK_PKG`), anonymised feedback analytics views, `06_TESTING/UNIT_TESTS/skills_feedback_tests.sql` (42 assertions, not executed).
+Closed in the latest revision: session editing (`update_session`), session completion (`complete_session`, nightly `close_finished_sessions`) and session-start reminders (`send_reminders`, 24 h/1 h learners, trainer 24 h, every 15 min), four notification templates (en/ar), `06_TESTING/UNIT_TESTS/session_edit_reminders_tests.sql` (40 assertions incl. setup, not executed). Before that: venue maintenance (`save_venue`, `remove_venue`, capacity/active checks in `create_session`), feedback reminders (`LMS_FEEDBACK_PKG.SEND_REMINDERS`, job `LMS_FEEDBACK_JOB`), `06_TESTING/UNIT_TESTS/venues_reminders_tests.sql` (26 assertions, not executed). Before that: skills framework maintenance (`LMS_SKILL_PKG`), feedback questionnaire authoring and review policy (`LMS_FEEDBACK_PKG`), anonymised feedback analytics views, `06_TESTING/UNIT_TESTS/skills_feedback_tests.sql` (42 assertions, not executed).
 
 Closed earlier: course text/objectives, lesson content and sanitising, content versions, reorder/rename/remove of modules and lessons,
 document upload with type/size/magic-byte checks, signed content URLs, question-bank authoring with immutability, quiz settings and validation,

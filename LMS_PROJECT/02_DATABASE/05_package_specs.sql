@@ -223,6 +223,18 @@ CREATE OR REPLACE PACKAGE lms_session_pkg AS
   PROCEDURE reschedule(p_session_id IN NUMBER, p_start_ts IN TIMESTAMP WITH TIME ZONE,
                        p_end_ts IN TIMESTAMP WITH TIME ZONE);
   PROCEDURE record_attendance(p_session_enrollment_id IN NUMBER, p_day IN DATE, p_status IN VARCHAR2);
+  /* Edit an UPCOMING session (SCHEDULED/PUBLISHED, not started). Refuses seats below the registered count, an inactive or too small
+     venue, a double-booked venue/trainer, and a change of the attendance threshold once attendance has been recorded.
+     Participants are notified when the place, link or trainer changes; extra seats promote the waiting list. */
+  PROCEDURE update_session(p_session_id IN NUMBER, p_venue_id IN NUMBER, p_instructor_id IN NUMBER, p_seats IN NUMBER,
+                           p_meeting_url IN VARCHAR2, p_min_attendance_pct IN NUMBER);
+  /* Close a PUBLISHED session after it ended and re-evaluate course completion of every registered learner. */
+  PROCEDURE complete_session(p_session_id IN NUMBER);
+  /* JOB (daily): completes PUBLISHED sessions that ended more than SESSION_AUTOCLOSE_DAYS ago (0 = off). Returns sessions closed. */
+  FUNCTION close_finished_sessions RETURN NUMBER;
+  /* JOB (every 15 min): reminders SESSION_REMINDER_LONG_HOURS (24) and SESSION_REMINDER_SHORT_HOURS (1) before the start to
+     REGISTERED learners (never waiting list), plus one trainer reminder. Each is sent once per registration. Returns reminders queued. */
+  FUNCTION send_reminders RETURN NUMBER;
 END lms_session_pkg;
 /
 

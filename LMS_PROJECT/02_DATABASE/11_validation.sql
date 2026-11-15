@@ -69,16 +69,16 @@ BEGIN
   SELECT COUNT(*) INTO l_n FROM lms_permissions;               chk(l_n >= 22, 'permissions seeded (' || l_n || ')');
   SELECT COUNT(*) INTO l_n FROM lms_role_permissions;          chk(l_n >= 50, 'role-permission rows seeded (' || l_n || ')');
   SELECT COUNT(*) INTO l_n FROM lms_rate_limit_policies WHERE enabled_flag = 'Y'; chk(l_n >= 10, 'rate-limit policies incl. CERT_VERIFY, HR_SYNC (' || l_n || ')');
-  SELECT COUNT(*) INTO l_n FROM lms_notification_templates;    chk(l_n >= 48, 'notification templates en+ar (' || l_n || ')');
+  SELECT COUNT(*) INTO l_n FROM lms_notification_templates;    chk(l_n >= 56, 'notification templates en+ar (' || l_n || ')');
   SELECT COUNT(DISTINCT template_code) INTO l_n FROM lms_notification_templates t
    WHERE (SELECT COUNT(*) FROM lms_notification_templates x WHERE x.template_code = t.template_code) = 2;
-  chk(l_n >= 24, 'every template has both languages (' || l_n || ')');
+  chk(l_n >= 28, 'every template has both languages (' || l_n || ')');
   SELECT COUNT(*) INTO l_n FROM lms_system_settings WHERE setting_key IN ('RETAIN_AUDIT_DAYS','QUIZ_GRACE_SECONDS','RENEWAL_WINDOW_DAYS');
   chk(l_n = 3, 'core settings present');
 
   -- 7. jobs
   SELECT COUNT(*) INTO l_n FROM user_scheduler_jobs WHERE job_name LIKE 'LMS\_%' ESCAPE '\' AND enabled = 'TRUE';
-  chk(l_n >= 9, 'scheduler jobs enabled (' || l_n || ')');
+  chk(l_n >= 11, 'scheduler jobs enabled (' || l_n || ')');
 
   -- 8. every foreign key column should be indexed (lock/perf hygiene)
   SELECT COUNT(*) INTO l_n FROM (
