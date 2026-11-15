@@ -1,5 +1,7 @@
 # 05 — UI/UX Design and APEX Page Specifications (Steps 7 & 9)
 
+> **Detailed, page-by-page build specifications now live in `03_APEX/`** (regions with SQL, items, processes, Ajax callbacks, authorization, performance) and the ORDS/REST layer in `05_INTEGRATIONS/`. This document keeps the design system, screen inventory and navigation. Page numbers below are the original proposal; `03_APEX/PAGE_SPECIFICATIONS/` is authoritative where they differ.
+
 Status: specification only. No APEX export was generated or validated. Page numbers are proposals.
 
 ## 1. Design system

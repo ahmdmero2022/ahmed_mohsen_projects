@@ -104,13 +104,12 @@ CREATE OR REPLACE PACKAGE BODY lms_certification_pkg AS
     lms_audit_pkg.log_event('CERT_DOWNLOAD', 'CERTIFICATE', p_certificate_id);
   END authorize_download;
 
-  FUNCTION verify(p_code IN VARCHAR2, p_client_key IN VARCHAR2) RETURN SYS_REFCURSOR IS
+  FUNCTION lookup_certificate(p_code IN VARCHAR2) RETURN SYS_REFCURSOR IS
     l_c    SYS_REFCURSOR;
     l_mode VARCHAR2(10) := UPPER(lms_util_pkg.get_setting('CERT_VERIFY_NAME', 'INITIALS'));
     l_code VARCHAR2(40) := UPPER(TRIM(SUBSTR(p_code, 1, 40)));
     l_n    NUMBER;
   BEGIN
-    lms_rate_limit_pkg.enforce_limit('CERT_VERIFY', NULL, p_client_key);   -- anonymous callers keyed by verified client address
     SELECT COUNT(*) INTO l_n FROM lms_certificates WHERE verification_code = l_code;
     IF l_n = 0 THEN
       lms_audit_pkg.log_security('CERT_VERIFY_MISS', NULL, NULL, 'CERT_VERIFY', 'INFO', NULL);   -- code itself not logged
@@ -126,6 +125,12 @@ CREATE OR REPLACE PACKAGE BODY lms_certification_pkg AS
         FROM lms_certificates ce JOIN lms_users u ON u.user_id = ce.user_id
        WHERE ce.verification_code = l_code;
     RETURN l_c;
+  END lookup_certificate;
+
+  FUNCTION verify(p_code IN VARCHAR2, p_client_key IN VARCHAR2) RETURN SYS_REFCURSOR IS
+  BEGIN
+    lms_rate_limit_pkg.enforce_limit('CERT_VERIFY', NULL, p_client_key);   -- anonymous callers keyed by verified client address
+    RETURN lookup_certificate(p_code);
   END verify;
 
   PROCEDURE revoke(p_certificate_id IN NUMBER, p_reason IN VARCHAR2) IS
@@ -394,23 +399,7 @@ CREATE OR REPLACE PACKAGE BODY lms_reporting_pkg AS
       lms_audit_pkg.log_event('ACCESS_DENIED', 'REPORT', NULL, 'DENIED', lms_util_pkg.js('report', 'org_kpis'));
       RAISE_APPLICATION_ERROR(-20403, 'Not authorized');
     END IF;
-    OPEN l_c FOR
-      SELECT (SELECT COUNT(*) FROM lms_users WHERE status = 'ACTIVE')                                   AS total_learners,
-             (SELECT COUNT(DISTINCT user_id) FROM lms_enrollments
-               WHERE last_activity_at >= SYSTIMESTAMP - INTERVAL '30' DAY)                              AS active_learners,
-             (SELECT COUNT(*) FROM lms_courses)                                                         AS total_courses,
-             (SELECT COUNT(*) FROM lms_courses WHERE status = 'PUBLISHED')                              AS published_courses,
-             (SELECT COUNT(*) FROM lms_enrollments WHERE status NOT IN ('CANCELLED','WAITLISTED'))      AS total_enrollments,
-             (SELECT ROUND(100 * SUM(CASE WHEN status = 'COMPLETED' THEN 1 ELSE 0 END) / NULLIF(COUNT(*), 0), 1)
-                FROM lms_enrollments WHERE status NOT IN ('CANCELLED','WAITLISTED','PENDING'))          AS completion_rate_pct,
-             (SELECT ROUND(AVG(avg_score), 1) FROM lms_sum_course)                                      AS avg_assessment_score,
-             (SELECT ROUND(100 * SUM(CASE WHEN status = 'COMPLETED' THEN 1 ELSE 0 END) / NULLIF(COUNT(*), 0), 1)
-                FROM lms_enrollments WHERE enrollment_type = 'MANDATORY' AND status NOT IN ('CANCELLED','EXPIRED')) AS mandatory_compliance_pct,
-             (SELECT COUNT(*) FROM lms_certificates WHERE status IN ('VALID','EXPIRED','REVOKED'))      AS certificates_issued,
-             (SELECT COUNT(*) FROM lms_certificates WHERE status = 'EXPIRED')                           AS certificates_expired,
-             (SELECT ROUND(SUM(time_spent_sec) / 3600, 1) FROM lms_enrollments)                         AS learning_hours,
-             (SELECT MAX(refreshed_at) FROM lms_sum_course)                                             AS summaries_refreshed_at
-        FROM dual;
+    OPEN l_c FOR SELECT * FROM v_lms_org_kpis;     -- single definition shared with the dashboard page
     RETURN l_c;
   END org_kpis;
 END lms_reporting_pkg;

@@ -40,7 +40,8 @@ BEGIN
   FOR r IN (SELECT column_value p FROM TABLE(sys.odcivarchar2list(
       'LMS_UTIL_PKG','LMS_SECURITY_PKG','LMS_AUDIT_PKG','LMS_RATE_LIMIT_PKG','LMS_NOTIFICATION_PKG','LMS_APPROVAL_PKG',
       'LMS_USER_PKG','LMS_HR_SYNC_PKG','LMS_COURSE_PKG','LMS_ENROLLMENT_PKG','LMS_PROGRESS_PKG','LMS_ASSESSMENT_PKG',
-      'LMS_LEARNING_PATH_PKG','LMS_SESSION_PKG','LMS_CERTIFICATION_PKG','LMS_FEEDBACK_PKG','LMS_SKILL_PKG','LMS_REPORTING_PKG'))) LOOP
+      'LMS_LEARNING_PATH_PKG','LMS_SESSION_PKG','LMS_CERTIFICATION_PKG','LMS_FEEDBACK_PKG','LMS_SKILL_PKG','LMS_REPORTING_PKG',
+      'LMS_SECRET_PKG','LMS_APEX_PKG','LMS_ADMIN_PKG','LMS_ORDS_PKG'))) LOOP
     SELECT COUNT(*) INTO l_n FROM user_objects
      WHERE object_name = r.p AND object_type IN ('PACKAGE','PACKAGE BODY') AND status = 'VALID';
     chk(l_n = 2, 'package ' || r.p || ' (spec+body valid)');
@@ -51,6 +52,9 @@ BEGIN
   chk(l_n = 1, 'unique open-enrolment index (BR-01)');
   SELECT COUNT(*) INTO l_n FROM user_indexes WHERE index_name IN ('LMS_CERT_ENR_UK','LMS_CERT_PE_UK','LMS_QA_OPEN_UK','LMS_APR_OPEN_UK') AND uniqueness = 'UNIQUE';
   chk(l_n = 4, 'idempotency unique indexes (certificates, open attempt, open approval)');
+
+  SELECT COUNT(*) INTO l_n FROM user_views WHERE view_name LIKE 'V\_LMS\_%' ESCAPE '\' OR view_name = 'LMS_COURSE_RATING_V';
+  chk(l_n >= 75, 'views present (' || l_n || ')');
 
   -- 5. answer keys must not be exposed by learner-facing views
   SELECT COUNT(*) INTO l_n FROM user_tab_columns
@@ -64,7 +68,7 @@ BEGIN
   SELECT COUNT(*) INTO l_n FROM lms_roles;                     chk(l_n >= 6,  'roles seeded (' || l_n || ')');
   SELECT COUNT(*) INTO l_n FROM lms_permissions;               chk(l_n >= 22, 'permissions seeded (' || l_n || ')');
   SELECT COUNT(*) INTO l_n FROM lms_role_permissions;          chk(l_n >= 50, 'role-permission rows seeded (' || l_n || ')');
-  SELECT COUNT(*) INTO l_n FROM lms_rate_limit_policies WHERE enabled_flag = 'Y'; chk(l_n >= 9, 'rate-limit policies (' || l_n || ')');
+  SELECT COUNT(*) INTO l_n FROM lms_rate_limit_policies WHERE enabled_flag = 'Y'; chk(l_n >= 10, 'rate-limit policies incl. CERT_VERIFY, HR_SYNC (' || l_n || ')');
   SELECT COUNT(*) INTO l_n FROM lms_notification_templates;    chk(l_n >= 46, 'notification templates en+ar (' || l_n || ')');
   SELECT COUNT(DISTINCT template_code) INTO l_n FROM lms_notification_templates t
    WHERE (SELECT COUNT(*) FROM lms_notification_templates x WHERE x.template_code = t.template_code) = 2;

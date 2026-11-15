@@ -88,11 +88,29 @@ CREATE OR REPLACE PACKAGE lms_course_pkg AS
                       p_prereq_lesson_id IN NUMBER DEFAULT NULL) RETURN NUMBER;
   PROCEDURE add_prerequisite(p_course_id IN NUMBER, p_prereq_course_id IN NUMBER);
   PROCEDURE set_instructor(p_course_id IN NUMBER, p_user_id IN NUMBER, p_role IN VARCHAR2 DEFAULT 'LEAD');
+  PROCEDURE set_certificate_template(p_course_id IN NUMBER, p_template_id IN NUMBER);
   /* NULL when publishable, otherwise a message naming the first problem. */
   FUNCTION validate_publishable(p_course_id IN NUMBER) RETURN VARCHAR2;
   PROCEDURE submit_for_review(p_course_id IN NUMBER);
   PROCEDURE apply_review(p_course_id IN NUMBER, p_approved IN BOOLEAN, p_note IN VARCHAR2 DEFAULT NULL)
     ACCESSIBLE BY (PACKAGE lms_approval_pkg);
+  /* Descriptive text is stored as PLAIN TEXT and must be escaped on output. p_thumbnail_ref = object-store key. */
+  PROCEDURE set_course_text(p_course_id IN NUMBER, p_row_version IN NUMBER,
+                            p_description_en IN CLOB, p_description_ar IN CLOB,
+                            p_objectives_en IN VARCHAR2, p_objectives_ar IN VARCHAR2, p_thumbnail_ref IN VARCHAR2);
+  /* Sets reference/text of a lesson, sanitises HTML lessons, writes a LMS_CONTENT_VERSIONS row. */
+  PROCEDURE set_lesson_content(p_lesson_id IN NUMBER, p_content_ref IN VARCHAR2, p_content_text IN VARCHAR2);
+  PROCEDURE update_module(p_module_id IN NUMBER, p_title_en IN VARCHAR2, p_title_ar IN VARCHAR2);
+  PROCEDURE update_lesson(p_lesson_id IN NUMBER, p_title_en IN VARCHAR2, p_title_ar IN VARCHAR2,
+                          p_lesson_type IN VARCHAR2, p_duration_minutes IN NUMBER, p_required_flag IN VARCHAR2,
+                          p_prereq_lesson_id IN NUMBER, p_available_from IN DATE DEFAULT NULL);
+  /* Document upload (<= 25 MB, allow-listed types, magic-byte check, SHA-256 stored). Storing a file does NOT replace the
+     virus scan your policy may require: run the scan on the upload before calling this (see doc 06). */
+  PROCEDURE add_lesson_file(p_lesson_id IN NUMBER, p_file_name IN VARCHAR2, p_mime_type IN VARCHAR2, p_blob IN BLOB);
+  PROCEDURE move_module(p_module_id IN NUMBER, p_direction IN VARCHAR2);      -- 'UP' | 'DOWN'
+  PROCEDURE move_lesson(p_lesson_id IN NUMBER, p_direction IN VARCHAR2);
+  PROCEDURE remove_module(p_module_id IN NUMBER);                             -- only when empty
+  PROCEDURE remove_lesson(p_lesson_id IN NUMBER);                             -- only without learner progress
   PROCEDURE suspend(p_course_id IN NUMBER);
   PROCEDURE reinstate(p_course_id IN NUMBER);
   PROCEDURE archive(p_course_id IN NUMBER);
@@ -112,6 +130,7 @@ CREATE OR REPLACE PACKAGE lms_enrollment_pkg AS
   FUNCTION create_assignment(p_course_id IN NUMBER, p_target_type IN VARCHAR2, p_target_id IN NUMBER,
                              p_due_date IN DATE) RETURN NUMBER;
   /* JOB: re-expand all ACTIVE assignments (new hires, users meeting prerequisites since). */
+  PROCEDURE close_assignment(p_assignment_id IN NUMBER);
   PROCEDURE sync_assignments;
   PROCEDURE apply_approval(p_enrollment_id IN NUMBER, p_approved IN BOOLEAN)
     ACCESSIBLE BY (PACKAGE lms_approval_pkg);
@@ -142,6 +161,23 @@ CREATE OR REPLACE PACKAGE lms_assessment_pkg AS
                        p_time_limit_min IN NUMBER DEFAULT NULL, p_max_attempts IN NUMBER DEFAULT 3,
                        p_lesson_id IN NUMBER DEFAULT NULL) RETURN NUMBER;
   PROCEDURE link_question(p_quiz_id IN NUMBER, p_question_id IN NUMBER, p_sort_order IN NUMBER DEFAULT 0);
+  PROCEDURE update_quiz(p_quiz_id IN NUMBER, p_title_en IN VARCHAR2, p_title_ar IN VARCHAR2, p_pass_score IN NUMBER,
+                        p_time_limit_min IN NUMBER, p_max_attempts IN NUMBER, p_question_count IN NUMBER,
+                        p_randomize_q IN VARCHAR2, p_randomize_a IN VARCHAR2, p_show_review IN VARCHAR2,
+                        p_required_flag IN VARCHAR2, p_available_from IN DATE, p_available_to IN DATE,
+                        p_active_flag IN VARCHAR2, p_lesson_id IN NUMBER DEFAULT NULL);
+  PROCEDURE unlink_question(p_quiz_id IN NUMBER, p_question_id IN NUMBER);
+  FUNCTION create_bank(p_name_en IN VARCHAR2, p_name_ar IN VARCHAR2 DEFAULT NULL) RETURN NUMBER;
+  /* p_question_id NULL = create. Questions already answered in any attempt are immutable (clone_question instead). */
+  FUNCTION save_question(p_question_id IN NUMBER, p_bank_id IN NUMBER, p_question_type IN VARCHAR2,
+                         p_text_en IN VARCHAR2, p_text_ar IN VARCHAR2, p_points IN NUMBER, p_active_flag IN VARCHAR2) RETURN NUMBER;
+  FUNCTION save_option(p_option_id IN NUMBER, p_question_id IN NUMBER, p_text_en IN VARCHAR2, p_text_ar IN VARCHAR2,
+                       p_is_correct IN VARCHAR2, p_match_key IN VARCHAR2, p_sort_order IN NUMBER DEFAULT 0) RETURN NUMBER;
+  PROCEDURE remove_option(p_option_id IN NUMBER);
+  PROCEDURE remove_question(p_question_id IN NUMBER);
+  FUNCTION clone_question(p_question_id IN NUMBER) RETURN NUMBER;
+  /* NULL when every active question of the quiz is answerable and has a consistent key, else the first problem. */
+  FUNCTION validate_quiz(p_quiz_id IN NUMBER) RETURN VARCHAR2;
   /* Returns the (new or resumed) attempt id. Eligibility, attempt limit and deadline are decided here. */
   FUNCTION start_attempt(p_quiz_id IN NUMBER) RETURN NUMBER;
   /* p_answer_json formats: {"selected":[optionId,...]} | {"pairs":[{"option":id,"choice":"text"}]} | {"text":"..."} */
@@ -194,6 +230,10 @@ CREATE OR REPLACE PACKAGE lms_certification_pkg AS
   /* Public verification. p_client_key = proxy-verified client address (hashed by the limiter).
      Returns title, status, dates and a minimal holder label only. */
   FUNCTION verify(p_code IN VARCHAR2, p_client_key IN VARCHAR2) RETURN SYS_REFCURSOR;
+  /* Same result without throttling. Only the ORDS package may call it: it applies the limiter itself so it can
+     answer HTTP 429 with Retry-After. Keeping it ACCESSIBLE BY prevents bypassing the limit from APEX/SQL. */
+  FUNCTION lookup_certificate(p_code IN VARCHAR2) RETURN SYS_REFCURSOR
+    ACCESSIBLE BY (PACKAGE lms_ords_pkg, PACKAGE lms_certification_pkg);
   PROCEDURE revoke(p_certificate_id IN NUMBER, p_reason IN VARCHAR2);
   /* JOB */
   PROCEDURE expire_due;

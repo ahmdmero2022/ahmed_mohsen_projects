@@ -527,9 +527,23 @@ CREATE OR REPLACE PACKAGE BODY lms_course_pkg AS
     lms_audit_pkg.log_event('COURSE_INSTRUCTOR', 'COURSE', p_course_id, 'SUCCESS', lms_util_pkg.js('user', p_user_id));
   END set_instructor;
 
+  PROCEDURE set_certificate_template(p_course_id IN NUMBER, p_template_id IN NUMBER) IS
+    l_n NUMBER;
+  BEGIN
+    assert_editable(p_course_id);
+    IF p_template_id IS NOT NULL THEN
+      SELECT COUNT(*) INTO l_n FROM lms_certificate_templates WHERE template_id = p_template_id AND active_flag = 'Y';
+      IF l_n = 0 THEN RAISE_APPLICATION_ERROR(-20404, 'Certificate template not found'); END IF;
+    END IF;
+    UPDATE lms_courses SET certificate_template_id = p_template_id, updated_at = SYSTIMESTAMP, row_version = row_version + 1
+     WHERE course_id = p_course_id;
+    lms_audit_pkg.log_event('COURSE_CERT_TEMPLATE', 'COURSE', p_course_id);
+  END set_certificate_template;
+
   FUNCTION validate_publishable(p_course_id IN NUMBER) RETURN VARCHAR2 IS
     c lms_courses%ROWTYPE;
     l_n NUMBER;
+    l_msg VARCHAR2(400);
   BEGIN
     BEGIN SELECT * INTO c FROM lms_courses WHERE course_id = p_course_id;
     EXCEPTION WHEN NO_DATA_FOUND THEN RETURN 'Course not found'; END;
@@ -547,6 +561,10 @@ CREATE OR REPLACE PACKAGE BODY lms_course_pkg AS
          AND NOT EXISTS (SELECT 1 FROM lms_quiz_questions qq WHERE qq.quiz_id = z.quiz_id);
       IF l_n > 0 THEN RETURN 'A quiz has no questions'; END IF;
     END IF;
+    FOR z IN (SELECT quiz_id FROM lms_quizzes WHERE course_id = p_course_id AND active_flag = 'Y') LOOP
+      l_msg := lms_assessment_pkg.validate_quiz(z.quiz_id);
+      IF l_msg IS NOT NULL THEN RETURN l_msg; END IF;
+    END LOOP;
     IF c.completion_rule IN ('ATTENDANCE','LESSONS_ATTENDANCE') AND c.delivery_method = 'SELF_PACED' THEN
       RETURN 'Attendance rules need a classroom, virtual or blended delivery method';
     END IF;
@@ -619,6 +637,208 @@ CREATE OR REPLACE PACKAGE BODY lms_course_pkg AS
         lms_util_pkg.js('course', c.title_en, 'note', NVL(p_note, '-')));
     END IF;
   END apply_review;
+
+  -- Author-side guard: caller may manage the course AND the course is editable (DRAFT/SUSPENDED). Locks the row.
+  PROCEDURE assert_editable(p_course_id IN NUMBER) IS
+    l_status lms_courses.status%TYPE;
+  BEGIN
+    assert_manage(p_course_id);
+    BEGIN SELECT status INTO l_status FROM lms_courses WHERE course_id = p_course_id FOR UPDATE;
+    EXCEPTION WHEN NO_DATA_FOUND THEN RAISE_APPLICATION_ERROR(-20404, 'Course not found'); END;
+    IF l_status NOT IN ('DRAFT','SUSPENDED') THEN
+      RAISE_APPLICATION_ERROR(-20409, 'Only DRAFT or SUSPENDED courses can be edited');
+    END IF;
+  END assert_editable;
+
+  PROCEDURE set_course_text(p_course_id IN NUMBER, p_row_version IN NUMBER,
+                            p_description_en IN CLOB, p_description_ar IN CLOB,
+                            p_objectives_en IN VARCHAR2, p_objectives_ar IN VARCHAR2, p_thumbnail_ref IN VARCHAR2) IS
+  BEGIN
+    assert_editable(p_course_id);
+    IF p_thumbnail_ref IS NOT NULL AND NOT REGEXP_LIKE(p_thumbnail_ref, '^[A-Za-z0-9/_.-]{1,500}$') THEN
+      RAISE_APPLICATION_ERROR(-20400, 'Thumbnail must be an object-store key, not a URL');
+    END IF;
+    UPDATE lms_courses
+       SET description_en = p_description_en, description_ar = p_description_ar,
+           objectives_en = p_objectives_en, objectives_ar = p_objectives_ar, thumbnail_ref = p_thumbnail_ref,
+           updated_at = SYSTIMESTAMP, row_version = row_version + 1
+     WHERE course_id = p_course_id AND row_version = p_row_version;
+    IF SQL%ROWCOUNT = 0 THEN
+      RAISE_APPLICATION_ERROR(-20409, 'The course was changed by another user. Reload and retry.');
+    END IF;
+    lms_audit_pkg.log_event('COURSE_TEXT', 'COURSE', p_course_id);
+  END set_course_text;
+
+  PROCEDURE set_lesson_content(p_lesson_id IN NUMBER, p_content_ref IN VARCHAR2, p_content_text IN VARCHAR2) IS
+    l_course NUMBER; l_type lms_lessons.lesson_type%TYPE; l_text VARCHAR2(32767); l_ver NUMBER;
+  BEGIN
+    BEGIN
+      SELECT m.course_id, l.lesson_type INTO l_course, l_type
+        FROM lms_lessons l JOIN lms_modules m ON m.module_id = l.module_id WHERE l.lesson_id = p_lesson_id;
+    EXCEPTION WHEN NO_DATA_FOUND THEN RAISE_APPLICATION_ERROR(-20404, 'Lesson not found'); END;
+    assert_editable(l_course);
+    IF p_content_ref IS NOT NULL THEN
+      IF l_type = 'URL' AND NOT REGEXP_LIKE(p_content_ref, '^https://[^[:space:]]{1,980}$', 'i') THEN
+        RAISE_APPLICATION_ERROR(-20400, 'External links must start with https://');
+      ELSIF l_type <> 'URL' AND NOT (REGEXP_LIKE(p_content_ref, '^[A-Za-z0-9/_.-]{1,1000}$')
+                                     OR REGEXP_LIKE(p_content_ref, '^https://[^[:space:]]{1,980}$', 'i')) THEN
+        RAISE_APPLICATION_ERROR(-20400, 'Content reference must be an object-store key or an https link');
+      END IF;
+    END IF;
+    l_text := p_content_text;
+    IF l_type = 'HTML' AND l_text IS NOT NULL THEN
+      -- tags without attributes only: no links, images, styles or event handlers can survive
+      l_text := apex_escape.html_whitelist(l_text,
+        '<p>,<br>,<b>,<strong>,<i>,<em>,<u>,<ul>,<ol>,<li>,<h2>,<h3>,<h4>,<table>,<thead>,<tbody>,<tr>,<th>,<td>');
+    END IF;
+    SELECT NVL(MAX(version_no), 0) + 1 INTO l_ver FROM lms_content_versions WHERE lesson_id = p_lesson_id;
+    INSERT INTO lms_content_versions (lesson_id, version_no, content_ref, content_text, created_by)
+    VALUES (p_lesson_id, l_ver, p_content_ref, l_text, lms_security_pkg.current_user_id);
+    UPDATE lms_lessons SET content_ref = p_content_ref, content_text = l_text WHERE lesson_id = p_lesson_id;
+    lms_audit_pkg.log_event('LESSON_CONTENT', 'LESSON', p_lesson_id, 'SUCCESS', lms_util_pkg.js('version', l_ver));
+  END set_lesson_content;
+
+  PROCEDURE update_module(p_module_id IN NUMBER, p_title_en IN VARCHAR2, p_title_ar IN VARCHAR2) IS
+    l_course NUMBER;
+  BEGIN
+    BEGIN SELECT course_id INTO l_course FROM lms_modules WHERE module_id = p_module_id;
+    EXCEPTION WHEN NO_DATA_FOUND THEN RAISE_APPLICATION_ERROR(-20404, 'Module not found'); END;
+    assert_editable(l_course);
+    IF p_title_en IS NULL OR LENGTH(TRIM(p_title_en)) = 0 THEN RAISE_APPLICATION_ERROR(-20400, 'A module title is required'); END IF;
+    UPDATE lms_modules SET title_en = p_title_en, title_ar = p_title_ar WHERE module_id = p_module_id;
+  END update_module;
+
+  PROCEDURE update_lesson(p_lesson_id IN NUMBER, p_title_en IN VARCHAR2, p_title_ar IN VARCHAR2,
+                          p_lesson_type IN VARCHAR2, p_duration_minutes IN NUMBER, p_required_flag IN VARCHAR2,
+                          p_prereq_lesson_id IN NUMBER, p_available_from IN DATE DEFAULT NULL) IS
+    l_course NUMBER; l_n NUMBER;
+  BEGIN
+    BEGIN
+      SELECT m.course_id INTO l_course FROM lms_lessons l JOIN lms_modules m ON m.module_id = l.module_id WHERE l.lesson_id = p_lesson_id;
+    EXCEPTION WHEN NO_DATA_FOUND THEN RAISE_APPLICATION_ERROR(-20404, 'Lesson not found'); END;
+    assert_editable(l_course);
+    IF p_title_en IS NULL OR LENGTH(TRIM(p_title_en)) = 0 THEN RAISE_APPLICATION_ERROR(-20400, 'A lesson title is required'); END IF;
+    IF p_prereq_lesson_id IS NOT NULL THEN
+      IF p_prereq_lesson_id = p_lesson_id THEN RAISE_APPLICATION_ERROR(-20400, 'A lesson cannot require itself'); END IF;
+      SELECT COUNT(*) INTO l_n FROM lms_lessons l JOIN lms_modules m ON m.module_id = l.module_id
+       WHERE l.lesson_id = p_prereq_lesson_id AND m.course_id = l_course;
+      IF l_n = 0 THEN RAISE_APPLICATION_ERROR(-20400, 'Prerequisite lesson must belong to the same course'); END IF;
+      -- loop check: following the prerequisite chain from the proposed prerequisite must not reach this lesson
+      SELECT COUNT(*) INTO l_n FROM lms_lessons
+       WHERE lesson_id = p_lesson_id
+       START WITH lesson_id = p_prereq_lesson_id
+       CONNECT BY NOCYCLE lesson_id = PRIOR prereq_lesson_id
+       AND PRIOR prereq_lesson_id IS NOT NULL;
+      IF l_n > 0 THEN RAISE_APPLICATION_ERROR(-20409, 'Prerequisite would create a loop'); END IF;
+    END IF;
+    UPDATE lms_lessons
+       SET title_en = p_title_en, title_ar = p_title_ar, lesson_type = p_lesson_type, duration_minutes = NVL(p_duration_minutes, 0),
+           required_flag = p_required_flag, prereq_lesson_id = p_prereq_lesson_id, available_from = p_available_from
+     WHERE lesson_id = p_lesson_id;
+  END update_lesson;
+
+  PROCEDURE add_lesson_file(p_lesson_id IN NUMBER, p_file_name IN VARCHAR2, p_mime_type IN VARCHAR2, p_blob IN BLOB) IS
+    c_max CONSTANT NUMBER := 26214400;
+    l_course NUMBER; l_size NUMBER; l_magic VARCHAR2(8); l_id NUMBER; l_ok BOOLEAN; l_name VARCHAR2(255); l_ver NUMBER;
+  BEGIN
+    BEGIN
+      SELECT m.course_id INTO l_course FROM lms_lessons l JOIN lms_modules m ON m.module_id = l.module_id WHERE l.lesson_id = p_lesson_id;
+    EXCEPTION WHEN NO_DATA_FOUND THEN RAISE_APPLICATION_ERROR(-20404, 'Lesson not found'); END;
+    assert_editable(l_course);
+    l_size := NVL(DBMS_LOB.getlength(p_blob), 0);
+    IF l_size = 0 OR l_size > c_max THEN RAISE_APPLICATION_ERROR(-20400, 'File must be between 1 byte and 25 MB'); END IF;
+    l_magic := RAWTOHEX(DBMS_LOB.substr(p_blob, 4, 1));
+    l_ok := CASE p_mime_type
+              WHEN 'application/pdf' THEN l_magic LIKE '25504446%'
+              WHEN 'application/vnd.openxmlformats-officedocument.presentationml.presentation' THEN l_magic LIKE '504B0304%'
+              WHEN 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' THEN l_magic LIKE '504B0304%'
+              WHEN 'image/png' THEN l_magic LIKE '89504E47%'
+              WHEN 'image/jpeg' THEN l_magic LIKE 'FFD8FF%'
+              ELSE FALSE END;
+    IF NOT l_ok THEN RAISE_APPLICATION_ERROR(-20400, 'File type is not allowed or the content does not match its type'); END IF;
+    l_name := SUBSTR(REGEXP_REPLACE(NVL(p_file_name, 'file'), '[^A-Za-z0-9._-]', '_'), 1, 255);
+    INSERT INTO lms_lesson_content (lesson_id, storage_type, file_name, mime_type, file_size, checksum_sha256, file_blob, uploaded_by)
+    VALUES (p_lesson_id, 'BLOB', l_name, p_mime_type, l_size,
+            LOWER(RAWTOHEX(DBMS_CRYPTO.hash(p_blob, DBMS_CRYPTO.hash_sh256))), p_blob, lms_security_pkg.current_user_id)
+    RETURNING content_id INTO l_id;
+    SELECT NVL(MAX(version_no), 0) + 1 INTO l_ver FROM lms_content_versions WHERE lesson_id = p_lesson_id;
+    INSERT INTO lms_content_versions (lesson_id, version_no, content_ref, created_by)
+    VALUES (p_lesson_id, l_ver, 'blob:' || l_id, lms_security_pkg.current_user_id);
+    UPDATE lms_lessons SET content_ref = 'blob:' || l_id WHERE lesson_id = p_lesson_id;
+    lms_audit_pkg.log_event('LESSON_FILE', 'LESSON', p_lesson_id, 'SUCCESS', lms_util_pkg.js('bytes', l_size, 'mime', p_mime_type));
+  END add_lesson_file;
+
+  PROCEDURE move_module(p_module_id IN NUMBER, p_direction IN VARCHAR2) IS
+    l_course NUMBER; l_ord NUMBER; l_nb NUMBER; l_nb_ord NUMBER;
+  BEGIN
+    IF p_direction NOT IN ('UP','DOWN') THEN RAISE_APPLICATION_ERROR(-20400, 'Direction must be UP or DOWN'); END IF;
+    BEGIN SELECT course_id, sort_order INTO l_course, l_ord FROM lms_modules WHERE module_id = p_module_id;
+    EXCEPTION WHEN NO_DATA_FOUND THEN RAISE_APPLICATION_ERROR(-20404, 'Module not found'); END;
+    assert_editable(l_course);
+    BEGIN
+      SELECT module_id, sort_order INTO l_nb, l_nb_ord FROM (
+        SELECT module_id, sort_order FROM lms_modules
+         WHERE course_id = l_course
+           AND ((p_direction = 'UP' AND sort_order < l_ord) OR (p_direction = 'DOWN' AND sort_order > l_ord))
+         ORDER BY CASE WHEN p_direction = 'UP' THEN -sort_order ELSE sort_order END)
+       WHERE ROWNUM = 1;
+    EXCEPTION WHEN NO_DATA_FOUND THEN RETURN; END;          -- already first/last
+    -- three-step swap through a negative value keeps UNIQUE (course_id, sort_order) satisfied
+    UPDATE lms_modules SET sort_order = -l_ord WHERE module_id = p_module_id;
+    UPDATE lms_modules SET sort_order = l_ord WHERE module_id = l_nb;
+    UPDATE lms_modules SET sort_order = l_nb_ord WHERE module_id = p_module_id;
+  END move_module;
+
+  PROCEDURE move_lesson(p_lesson_id IN NUMBER, p_direction IN VARCHAR2) IS
+    l_course NUMBER; l_mod NUMBER; l_ord NUMBER; l_nb NUMBER; l_nb_ord NUMBER;
+  BEGIN
+    IF p_direction NOT IN ('UP','DOWN') THEN RAISE_APPLICATION_ERROR(-20400, 'Direction must be UP or DOWN'); END IF;
+    BEGIN
+      SELECT m.course_id, l.module_id, l.sort_order INTO l_course, l_mod, l_ord
+        FROM lms_lessons l JOIN lms_modules m ON m.module_id = l.module_id WHERE l.lesson_id = p_lesson_id;
+    EXCEPTION WHEN NO_DATA_FOUND THEN RAISE_APPLICATION_ERROR(-20404, 'Lesson not found'); END;
+    assert_editable(l_course);
+    BEGIN
+      SELECT lesson_id, sort_order INTO l_nb, l_nb_ord FROM (
+        SELECT lesson_id, sort_order FROM lms_lessons
+         WHERE module_id = l_mod
+           AND ((p_direction = 'UP' AND sort_order < l_ord) OR (p_direction = 'DOWN' AND sort_order > l_ord))
+         ORDER BY CASE WHEN p_direction = 'UP' THEN -sort_order ELSE sort_order END)
+       WHERE ROWNUM = 1;
+    EXCEPTION WHEN NO_DATA_FOUND THEN RETURN; END;
+    UPDATE lms_lessons SET sort_order = -l_ord WHERE lesson_id = p_lesson_id;
+    UPDATE lms_lessons SET sort_order = l_ord WHERE lesson_id = l_nb;
+    UPDATE lms_lessons SET sort_order = l_nb_ord WHERE lesson_id = p_lesson_id;
+  END move_lesson;
+
+  PROCEDURE remove_module(p_module_id IN NUMBER) IS
+    l_course NUMBER; l_n NUMBER;
+  BEGIN
+    BEGIN SELECT course_id INTO l_course FROM lms_modules WHERE module_id = p_module_id;
+    EXCEPTION WHEN NO_DATA_FOUND THEN RAISE_APPLICATION_ERROR(-20404, 'Module not found'); END;
+    assert_editable(l_course);
+    SELECT COUNT(*) INTO l_n FROM lms_lessons WHERE module_id = p_module_id;
+    IF l_n > 0 THEN RAISE_APPLICATION_ERROR(-20409, 'Remove the lessons of this module first'); END IF;
+    DELETE FROM lms_modules WHERE module_id = p_module_id;
+    lms_audit_pkg.log_event('MODULE_REMOVE', 'MODULE', p_module_id);
+  END remove_module;
+
+  PROCEDURE remove_lesson(p_lesson_id IN NUMBER) IS
+    l_course NUMBER; l_n NUMBER;
+  BEGIN
+    BEGIN
+      SELECT m.course_id INTO l_course FROM lms_lessons l JOIN lms_modules m ON m.module_id = l.module_id WHERE l.lesson_id = p_lesson_id;
+    EXCEPTION WHEN NO_DATA_FOUND THEN RAISE_APPLICATION_ERROR(-20404, 'Lesson not found'); END;
+    assert_editable(l_course);
+    SELECT COUNT(*) INTO l_n FROM lms_lesson_progress WHERE lesson_id = p_lesson_id;
+    IF l_n > 0 THEN RAISE_APPLICATION_ERROR(-20409, 'Learners already have progress on this lesson'); END IF;
+    SELECT COUNT(*) INTO l_n FROM lms_lessons WHERE prereq_lesson_id = p_lesson_id;
+    IF l_n > 0 THEN RAISE_APPLICATION_ERROR(-20409, 'Another lesson requires this lesson first'); END IF;
+    DELETE FROM lms_content_versions WHERE lesson_id = p_lesson_id;
+    DELETE FROM lms_lesson_content WHERE lesson_id = p_lesson_id;
+    DELETE FROM lms_lessons WHERE lesson_id = p_lesson_id;
+    lms_audit_pkg.log_event('LESSON_REMOVE', 'LESSON', p_lesson_id);
+  END remove_lesson;
 
   PROCEDURE change_status(p_course_id IN NUMBER, p_from IN VARCHAR2, p_to IN VARCHAR2, p_op IN VARCHAR2) IS
     l_status lms_courses.status%TYPE;

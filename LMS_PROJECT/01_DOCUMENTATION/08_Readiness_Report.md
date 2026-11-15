@@ -6,7 +6,9 @@
 |---|---|---|
 | Documents 01–07 | Written | Files in this repo |
 | Mermaid diagrams | **Unverified** | Not rendered; syntax reviewed by eye only |
-| `02_DATABASE/*.sql` (12 scripts, 56 tables, 16 views, 18 packages) | **Unverified on Oracle** | Not run or compiled. Static checks run: SQL parser on all DDL/views, name uniqueness, FK order, package call/spec/body consistency, validation list = DDL (see `02_DATABASE/README.md`) |
+| `02_DATABASE/*.sql` (16 scripts, 56 tables, 76 views, 22 packages) | **Unverified on Oracle** | Not run or compiled. Static checks run: SQL parser on all DDL/views, name uniqueness, FK order, package call/spec/body consistency, validation list = DDL (see `02_DATABASE/README.md`) |
+| `05_INTEGRATIONS/` ORDS modules, OpenAPI, smoke test | **Unverified** | ORDS API calls not executed; YAML parses; `bash -n` passes on the test script |
+| `03_APEX/` page specifications, shared components, static files | **Specification** | No APEX export; `player.js`/`assessment.js` pass `node --check` but were not run in a browser; CSS not rendered |
 | APEX export | **Not produced** | Page specs only |
 | Test execution | **None** | All tests unexecuted |
 | Performance figures | **Estimates** | Order-of-magnitude, not measured |
@@ -40,21 +42,31 @@ Open items:
 7. **No lesson/module update or reorder API**; IG-based authoring must call `CAN_MANAGE_COURSE` in its DML processes.
 8. **Learning hours** in `LMS_SUM_DEPT_DAILY` are attributed to the last-activity day (approximation).
 9. **Certificate PDF** layout (APEX report/`APEX_PRINT`) is not built; `V_LMS_CERTIFICATE_PRINT` and `AUTHORIZE_DOWNLOAD` are the data and authorisation hooks.
-10. **ERDs in doc 03** were not re-reconciled line by line after the DDL changes (section 5 of doc 03 lists the differences).
+10. **File type checks use magic bytes only**; there is no malware scan and no content-disarm for Office files (macros are not executed by the viewer, but the files are downloadable).
+11. **Signed content URLs** need `LMS_SECRET_PKG` to be replaced per environment; the shipped stub fails closed (`ORA-20500`).
+12. **`LMS_APEX_PKG.POST_AUTH`** relies on `APEX_UTIL.SET_SESSION_LANG`, `APEX_APPLICATION.STOP_APEX_ENGINE` and a redirect from a post-authentication procedure; confirm on 24.1.
+13. **ERDs in doc 03** were not re-reconciled line by line after the DDL changes (section 5 of doc 03 lists the differences).
 
 ## 4. Outstanding work
 
 | # | Work item | Prompt reference |
 |---|---|---|
-| 1 | Compile and test everything on Oracle 19c; fix defects; write utPLSQL (or script) tests for each package | §9, §19 |
-| 2 | Full per-page APEX definitions (items, DAs, validations, SQL) for every page in doc 05; APEX exports | §13 |
-| 3 | ORDS modules (HR sync, certificate verification, course search) and WAF configuration for the chosen product | §15 |
-| 4 | Wireframes and high-fidelity mock-ups; per-screen state tables | §11 |
-| 5 | JMeter/k6 scripts and data generators for 5k courses / 100k enrollments / 1M activity rows | §19 |
-| 6 | Arabic UI string translation (APEX Text Messages) and review of the Arabic notification templates by a native reviewer | §2 |
-| 7 | Lesson/module update, reorder and content-upload packages; certificate PDF layout | §5 M4, M10 |
-| 8 | Re-reconcile ERDs with DDL; generate a data dictionary from `USER_TAB_COLUMNS` | §7 |
-| 9 | Per-release reverse-migration scripts (the supplied rollback is a full drop) | §22 |
+| 1 | Install and compile on Oracle 19c (`00_install.sql`), fix findings, run `11_validation.sql`; write and run package tests (enrolment concurrency, rate limiting, assessment integrity, authorization) | §9, §19 |
+| 2 | Build the APEX applications from `03_APEX/` in a real 24.1 workspace; export; accessibility + RTL review in browsers | §13, §19.8 |
+| 3 | Run the ORDS scripts, confirm API behaviour (`:status_code`, `Retry-After` header parameter, OAuth client creation/rotation), run `ords_smoke_test.sh`; configure the WAF for the chosen product | §15 |
+| 4 | Content platform integration: pre-signed upload, signing-key provisioning (`LMS_SECRET_PKG` body per environment), virus scan hook | §5 M4, §14 |
+| 5 | Skills administration: no package procedures for `LMS_SKILLS`, `LMS_POSITION_SKILLS`, `LMS_COURSE_SKILLS` (HR cannot yet maintain the framework except by script) | §5 M11 |
+| 6 | Feedback questionnaire authoring (forms/questions) and feedback analytics pages; venue maintenance | §5 M9, M12 |
+| 7 | Skills history table if a skills *trend* is required (dashboard currently shows current gap index only) | §12.14 |
+| 8 | JMeter/k6 scripts and data generators for 5k courses / 100k enrolments / 1M activity rows | §19 |
+| 9 | Arabic UI/notification text review by a native speaker; XLIFF translation of page text | §2 |
+| 10 | Wireframes/mock-ups; re-reconcile ERDs with DDL; generate the data dictionary from `USER_TAB_COLUMNS` | §7, §11 |
+| 11 | Per-release reverse-migration scripts (the supplied rollback is a full drop) | §22 |
+| 12 | Business decisions: OQ-10 (may executives see individual learners?), quiz-exhaustion policy, executive role definition | doc 06 |
+
+Closed since the previous revision: course text/objectives, lesson content and sanitising, content versions, reorder/rename/remove of modules and lessons,
+document upload with type/size/magic-byte checks, signed content URLs, question-bank authoring with immutability, quiz settings and validation,
+certificate template and category administration, assignment closing, admin settings/rate-limit/role-matrix/template writes, ORDS API (verification, catalog, HR sync, health).
 
 ## 5. Risks
 

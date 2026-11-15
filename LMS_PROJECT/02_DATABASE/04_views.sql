@@ -42,10 +42,10 @@ SELECT e.enrollment_id, e.course_id, c.course_code, c.title_en, c.title_ar, c.du
 
 CREATE OR REPLACE VIEW v_lms_catalog AS
 SELECT c.course_id, c.course_code, c.title_en, c.title_ar,
-       c.description_en, c.description_ar,
+       c.description_en, c.description_ar, c.objectives_en, c.objectives_ar,
        c.category_id, cat.name_en AS category_en, cat.name_ar AS category_ar,
        c.difficulty, c.duration_minutes, c.language_code, c.delivery_method,
-       c.featured_flag, c.published_at, c.thumbnail_ref, c.certificate_eligible,
+       c.featured_flag, c.published_at, c.thumbnail_ref, c.certificate_eligible, c.approval_required, c.completion_rule,
        r.avg_rating, NVL(r.rating_count, 0) AS rating_count,
        (SELECT e.status FROM lms_enrollments e
          WHERE e.course_id = c.course_id

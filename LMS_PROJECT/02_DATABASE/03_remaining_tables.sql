@@ -393,6 +393,7 @@ CREATE TABLE lms_certificate_templates (
   CONSTRAINT lms_ct_act_ck CHECK (active_flag IN ('Y','N'))
 );
 
+ALTER TABLE lms_courses ADD (objectives_en VARCHAR2(4000), objectives_ar VARCHAR2(4000));
 ALTER TABLE lms_courses ADD (certificate_template_id NUMBER);
 ALTER TABLE lms_courses ADD CONSTRAINT lms_crs_ctpl_fk FOREIGN KEY (certificate_template_id) REFERENCES lms_certificate_templates (template_id);
 CREATE INDEX lms_crs_ctpl_ix ON lms_courses (certificate_template_id);

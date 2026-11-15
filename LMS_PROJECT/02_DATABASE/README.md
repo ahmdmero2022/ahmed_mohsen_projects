@@ -7,7 +7,7 @@ member has a body; the validation script's table list equals the DDL. **Not run:
 
 | Script | Contents |
 |---|---|
-| `00_install.sql` | Ordered installer (01 → 09, then 11). Excludes test data |
+| `00_install.sql` | Ordered installer (01 → 09, 13 → 16, compile, then 11). Excludes test data |
 | `01_core_schema.sql` | 21 tables: org, RBAC, categories, courses, prerequisites, modules, lessons, enrollments, lesson progress, settings, audit, security events, rate-limit policies/counters |
 | `02_packages_security_ratelimit.sql` | `LMS_UTIL_PKG`, `LMS_SECURITY_PKG`, `LMS_AUDIT_PKG`, `LMS_RATE_LIMIT_PKG`, rate-limit policy seed + purge job |
 | `03_remaining_tables.sql` | 35 further tables: content/versions, approvals, assignments, activity, assessments, paths, sessions, certificates, skills, feedback, notifications, API log, summary tables |
@@ -20,6 +20,12 @@ member has a body; the validation script's table list equals the DDL. **Not run:
 | `10_test_data.sql` | DEV/TEST only: TD-1..TD-3 data |
 | `11_validation.sql` | PASS/FAIL checks (objects valid, tables, packages, key indexes, answer-key exposure, seeds, jobs, unindexed FKs) |
 | `12_rollback.sql` | Drops every LMS object in the current schema (`@12_rollback.sql YES`); destructive |
+| `13_apex_glue.sql` | `LMS_SECRET_PKG` (stub), `LMS_APEX_PKG` (authorization functions, post-auth, error handler, Ajax callbacks, signed content URLs, lesson renderer, file streaming), `LMS_ADMIN_PKG` (audited admin writes) |
+| `14_ords_pkg.sql` | `LMS_ORDS_PKG` (handler logic for verification, catalog, HR sync, health) + `HR_SYNC` policy, `API_LOG_ENABLED`, `CONTENT_BASE_URL` settings |
+| `15_views_apex.sql` | 45 views behind the APEX pages: learner, approvals, authoring, administration, monitoring, analytics |
+| `16_views_lov.sql` | 15 lookup/detail/maintenance views (LOVs, course outline, prerequisites, instructors, popularity, admin lists) |
+
+Counts: 56 tables, 76 views, 22 packages (147 public members), 7 scheduler jobs, 10 rate-limit policies, 23 bilingual notification templates.
 
 ## Prerequisites
 - Schema owner privileges: `CREATE SESSION/TABLE/VIEW/SEQUENCE/PROCEDURE/JOB`, tablespace quota; **no DBA role**.

@@ -277,6 +277,15 @@ CREATE OR REPLACE PACKAGE BODY lms_enrollment_pkg AS
     RETURN l_id;
   END create_assignment;
 
+  PROCEDURE close_assignment(p_assignment_id IN NUMBER) IS
+  BEGIN
+    lms_security_pkg.require_permission('ENROLL_ASSIGN');
+    IF lms_security_pkg.permission_scope('ENROLL_ASSIGN') <> 'ALL' THEN RAISE_APPLICATION_ERROR(-20403, 'Not authorized'); END IF;
+    UPDATE lms_learning_assignments SET status = 'CLOSED' WHERE assignment_id = p_assignment_id AND status = 'ACTIVE';
+    IF SQL%ROWCOUNT = 0 THEN RAISE_APPLICATION_ERROR(-20409, 'Assignment not found or already closed'); END IF;
+    lms_audit_pkg.log_event('ASSIGNMENT_CLOSE', 'ASSIGNMENT', p_assignment_id);
+  END close_assignment;
+
   PROCEDURE sync_assignments IS
   BEGIN
     FOR r IN (SELECT assignment_id FROM lms_learning_assignments
@@ -550,6 +559,195 @@ CREATE OR REPLACE PACKAGE BODY lms_assessment_pkg AS
     INSERT INTO lms_quiz_questions (quiz_id, question_id, sort_order) VALUES (p_quiz_id, p_question_id, p_sort_order);
   EXCEPTION WHEN DUP_VAL_ON_INDEX THEN NULL;
   END link_question;
+
+  -- ---- authoring helpers -----------------------------------------------------------------
+  PROCEDURE assert_bank(p_bank_id IN NUMBER) IS
+    l_owner NUMBER;
+  BEGIN
+    lms_security_pkg.require_permission('QUIZ_AUTHOR');
+    BEGIN SELECT owner_user_id INTO l_owner FROM lms_question_banks WHERE bank_id = p_bank_id;
+    EXCEPTION WHEN NO_DATA_FOUND THEN RAISE_APPLICATION_ERROR(-20404, 'Question bank not found'); END;
+    IF l_owner <> lms_security_pkg.current_user_id AND lms_security_pkg.permission_scope('QUIZ_AUTHOR') <> 'ALL' THEN
+      lms_audit_pkg.log_event('ACCESS_DENIED', 'QUESTION_BANK', p_bank_id, 'DENIED');
+      RAISE_APPLICATION_ERROR(-20403, 'Not authorized');
+    END IF;
+  END assert_bank;
+
+  FUNCTION question_bank(p_question_id IN NUMBER) RETURN NUMBER IS
+    l_bank NUMBER;
+  BEGIN
+    SELECT bank_id INTO l_bank FROM lms_questions WHERE question_id = p_question_id;
+    RETURN l_bank;
+  EXCEPTION WHEN NO_DATA_FOUND THEN RAISE_APPLICATION_ERROR(-20404, 'Question not found');
+  END question_bank;
+
+  PROCEDURE assert_mutable(p_question_id IN NUMBER) IS
+    l_n NUMBER;
+  BEGIN
+    SELECT COUNT(*) INTO l_n FROM lms_quiz_responses WHERE question_id = p_question_id AND ROWNUM = 1;
+    IF l_n > 0 THEN
+      RAISE_APPLICATION_ERROR(-20409, 'This question was already answered by learners and cannot be changed. Clone it instead.');
+    END IF;
+  END assert_mutable;
+
+  PROCEDURE assert_quiz_edit(p_quiz_id IN NUMBER) IS
+    l_course NUMBER;
+  BEGIN
+    BEGIN SELECT course_id INTO l_course FROM lms_quizzes WHERE quiz_id = p_quiz_id;
+    EXCEPTION WHEN NO_DATA_FOUND THEN RAISE_APPLICATION_ERROR(-20404, 'Quiz not found'); END;
+    IF NOT lms_course_pkg.can_manage_course(l_course, 'QUIZ_AUTHOR') THEN
+      lms_audit_pkg.log_event('ACCESS_DENIED', 'QUIZ', p_quiz_id, 'DENIED');
+      RAISE_APPLICATION_ERROR(-20403, 'Not authorized');
+    END IF;
+  END assert_quiz_edit;
+
+  PROCEDURE update_quiz(p_quiz_id IN NUMBER, p_title_en IN VARCHAR2, p_title_ar IN VARCHAR2, p_pass_score IN NUMBER,
+                        p_time_limit_min IN NUMBER, p_max_attempts IN NUMBER, p_question_count IN NUMBER,
+                        p_randomize_q IN VARCHAR2, p_randomize_a IN VARCHAR2, p_show_review IN VARCHAR2,
+                        p_required_flag IN VARCHAR2, p_available_from IN DATE, p_available_to IN DATE,
+                        p_active_flag IN VARCHAR2, p_lesson_id IN NUMBER DEFAULT NULL) IS
+    l_attempts NUMBER;
+  BEGIN
+    assert_quiz_edit(p_quiz_id);
+    -- changing the pass mark or attempt rules under learners who already attempted would make results inconsistent
+    SELECT COUNT(*) INTO l_attempts FROM lms_quiz_attempts WHERE quiz_id = p_quiz_id AND ROWNUM = 1;
+    IF l_attempts > 0 THEN
+      DECLARE l_pass NUMBER; l_questions NUMBER; BEGIN
+        SELECT pass_score, question_count INTO l_pass, l_questions FROM lms_quizzes WHERE quiz_id = p_quiz_id;
+        IF l_pass <> p_pass_score OR NVL(l_questions, -1) <> NVL(p_question_count, -1) THEN
+          RAISE_APPLICATION_ERROR(-20409, 'Pass mark and question count cannot change after learners have attempted the quiz');
+        END IF;
+      END;
+    END IF;
+    UPDATE lms_quizzes
+       SET title_en = p_title_en, title_ar = p_title_ar, pass_score = p_pass_score, time_limit_min = p_time_limit_min,
+           max_attempts = p_max_attempts, question_count = p_question_count, randomize_q = p_randomize_q,
+           randomize_a = p_randomize_a, show_review = p_show_review, required_flag = p_required_flag,
+           available_from = p_available_from, available_to = p_available_to, active_flag = p_active_flag, lesson_id = p_lesson_id
+     WHERE quiz_id = p_quiz_id;
+    lms_audit_pkg.log_event('QUIZ_UPDATE', 'QUIZ', p_quiz_id);
+  END update_quiz;
+
+  PROCEDURE unlink_question(p_quiz_id IN NUMBER, p_question_id IN NUMBER) IS
+    l_n NUMBER;
+  BEGIN
+    assert_quiz_edit(p_quiz_id);
+    SELECT COUNT(*) INTO l_n FROM lms_quiz_attempts WHERE quiz_id = p_quiz_id AND ROWNUM = 1;
+    IF l_n > 0 THEN RAISE_APPLICATION_ERROR(-20409, 'Questions cannot be removed after learners have attempted the quiz'); END IF;
+    DELETE FROM lms_quiz_questions WHERE quiz_id = p_quiz_id AND question_id = p_question_id;
+  END unlink_question;
+
+  FUNCTION create_bank(p_name_en IN VARCHAR2, p_name_ar IN VARCHAR2 DEFAULT NULL) RETURN NUMBER IS
+    l_id NUMBER;
+  BEGIN
+    lms_security_pkg.require_permission('QUIZ_AUTHOR');
+    IF p_name_en IS NULL OR LENGTH(TRIM(p_name_en)) = 0 THEN RAISE_APPLICATION_ERROR(-20400, 'A bank name is required'); END IF;
+    INSERT INTO lms_question_banks (name_en, name_ar, owner_user_id)
+    VALUES (p_name_en, p_name_ar, lms_security_pkg.current_user_id) RETURNING bank_id INTO l_id;
+    RETURN l_id;
+  END create_bank;
+
+  FUNCTION save_question(p_question_id IN NUMBER, p_bank_id IN NUMBER, p_question_type IN VARCHAR2,
+                         p_text_en IN VARCHAR2, p_text_ar IN VARCHAR2, p_points IN NUMBER, p_active_flag IN VARCHAR2) RETURN NUMBER IS
+    l_id NUMBER := p_question_id;
+  BEGIN
+    IF p_question_type NOT IN ('MCQ','MULTI','TF','MATCH','SHORT','ESSAY') OR p_points IS NULL OR p_points <= 0
+       OR p_text_en IS NULL OR LENGTH(TRIM(p_text_en)) = 0 OR p_active_flag NOT IN ('Y','N') THEN
+      RAISE_APPLICATION_ERROR(-20400, 'Invalid question');
+    END IF;
+    IF l_id IS NULL THEN
+      assert_bank(p_bank_id);
+      INSERT INTO lms_questions (bank_id, question_type, text_en, text_ar, points, active_flag)
+      VALUES (p_bank_id, p_question_type, p_text_en, p_text_ar, p_points, p_active_flag) RETURNING question_id INTO l_id;
+    ELSE
+      assert_bank(question_bank(l_id));
+      assert_mutable(l_id);
+      UPDATE lms_questions SET question_type = p_question_type, text_en = p_text_en, text_ar = p_text_ar,
+             points = p_points, active_flag = p_active_flag WHERE question_id = l_id;
+    END IF;
+    lms_audit_pkg.log_event('QUESTION_SAVE', 'QUESTION', l_id);
+    RETURN l_id;
+  END save_question;
+
+  FUNCTION save_option(p_option_id IN NUMBER, p_question_id IN NUMBER, p_text_en IN VARCHAR2, p_text_ar IN VARCHAR2,
+                       p_is_correct IN VARCHAR2, p_match_key IN VARCHAR2, p_sort_order IN NUMBER DEFAULT 0) RETURN NUMBER IS
+    l_id NUMBER := p_option_id;
+  BEGIN
+    assert_bank(question_bank(p_question_id));
+    assert_mutable(p_question_id);
+    IF p_text_en IS NULL OR LENGTH(TRIM(p_text_en)) = 0 OR p_is_correct NOT IN ('Y','N') THEN
+      RAISE_APPLICATION_ERROR(-20400, 'Invalid option');
+    END IF;
+    IF l_id IS NULL THEN
+      INSERT INTO lms_question_options (question_id, option_text_en, option_text_ar, is_correct, match_key, sort_order)
+      VALUES (p_question_id, p_text_en, p_text_ar, p_is_correct, p_match_key, NVL(p_sort_order, 0)) RETURNING option_id INTO l_id;
+    ELSE
+      UPDATE lms_question_options SET option_text_en = p_text_en, option_text_ar = p_text_ar, is_correct = p_is_correct,
+             match_key = p_match_key, sort_order = NVL(p_sort_order, 0)
+       WHERE option_id = l_id AND question_id = p_question_id;
+      IF SQL%ROWCOUNT = 0 THEN RAISE_APPLICATION_ERROR(-20404, 'Option not found'); END IF;
+    END IF;
+    RETURN l_id;
+  END save_option;
+
+  PROCEDURE remove_option(p_option_id IN NUMBER) IS
+    l_q NUMBER;
+  BEGIN
+    BEGIN SELECT question_id INTO l_q FROM lms_question_options WHERE option_id = p_option_id;
+    EXCEPTION WHEN NO_DATA_FOUND THEN RAISE_APPLICATION_ERROR(-20404, 'Option not found'); END;
+    assert_bank(question_bank(l_q));
+    assert_mutable(l_q);
+    DELETE FROM lms_question_options WHERE option_id = p_option_id;
+  END remove_option;
+
+  PROCEDURE remove_question(p_question_id IN NUMBER) IS
+    l_n NUMBER;
+  BEGIN
+    assert_bank(question_bank(p_question_id));
+    assert_mutable(p_question_id);
+    SELECT COUNT(*) INTO l_n FROM lms_quiz_questions WHERE question_id = p_question_id;
+    IF l_n > 0 THEN RAISE_APPLICATION_ERROR(-20409, 'The question is used by a quiz. Unlink it first, or deactivate it.'); END IF;
+    DELETE FROM lms_question_options WHERE question_id = p_question_id;
+    DELETE FROM lms_questions WHERE question_id = p_question_id;
+    lms_audit_pkg.log_event('QUESTION_REMOVE', 'QUESTION', p_question_id);
+  END remove_question;
+
+  FUNCTION clone_question(p_question_id IN NUMBER) RETURN NUMBER IS
+    l_new NUMBER;
+  BEGIN
+    assert_bank(question_bank(p_question_id));
+    INSERT INTO lms_questions (bank_id, question_type, text_en, text_ar, points, active_flag)
+    SELECT bank_id, question_type, text_en, text_ar, points, 'Y' FROM lms_questions WHERE question_id = p_question_id
+    RETURNING question_id INTO l_new;
+    INSERT INTO lms_question_options (question_id, option_text_en, option_text_ar, is_correct, match_key, sort_order)
+    SELECT l_new, option_text_en, option_text_ar, is_correct, match_key, sort_order
+      FROM lms_question_options WHERE question_id = p_question_id;
+    lms_audit_pkg.log_event('QUESTION_CLONE', 'QUESTION', l_new, 'SUCCESS', lms_util_pkg.js('from', p_question_id));
+    RETURN l_new;
+  END clone_question;
+
+  FUNCTION validate_quiz(p_quiz_id IN NUMBER) RETURN VARCHAR2 IS
+  BEGIN
+    FOR q IN (SELECT z.title_en quiz_title, qs.question_id, qs.question_type, qs.text_en,
+                     (SELECT COUNT(*) FROM lms_question_options o WHERE o.question_id = qs.question_id) opts,
+                     (SELECT COUNT(*) FROM lms_question_options o WHERE o.question_id = qs.question_id AND o.is_correct = 'Y') correct,
+                     (SELECT COUNT(*) FROM lms_question_options o WHERE o.question_id = qs.question_id AND o.match_key IS NOT NULL) pairs
+                FROM lms_quizzes z
+                JOIN lms_quiz_questions qq ON qq.quiz_id = z.quiz_id
+                JOIN lms_questions qs ON qs.question_id = qq.question_id AND qs.active_flag = 'Y'
+               WHERE z.quiz_id = p_quiz_id ORDER BY qq.sort_order, qs.question_id) LOOP
+      IF q.question_type IN ('MCQ','TF') AND (q.opts < 2 OR q.correct <> 1) THEN
+        RETURN 'Question "' || SUBSTR(q.text_en, 1, 60) || '" needs at least 2 options and exactly 1 correct';
+      ELSIF q.question_type = 'MULTI' AND (q.opts < 2 OR q.correct < 1) THEN
+        RETURN 'Question "' || SUBSTR(q.text_en, 1, 60) || '" needs at least 2 options and 1 correct';
+      ELSIF q.question_type = 'MATCH' AND q.pairs < 2 THEN
+        RETURN 'Question "' || SUBSTR(q.text_en, 1, 60) || '" needs at least 2 pairs';
+      ELSIF q.question_type = 'SHORT' AND q.correct < 1 THEN
+        RETURN 'Question "' || SUBSTR(q.text_en, 1, 60) || '" needs at least 1 accepted answer';
+      END IF;
+    END LOOP;
+    RETURN NULL;
+  END validate_quiz;
 
   -- Scores one response. NULL = needs manual grading.
   FUNCTION score_response(p_question_id IN NUMBER, p_type IN VARCHAR2, p_answer IN VARCHAR2,
