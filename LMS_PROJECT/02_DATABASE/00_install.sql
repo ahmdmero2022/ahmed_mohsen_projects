@@ -3,7 +3,7 @@
 -- Prerequisite (once, as DBA):  GRANT EXECUTE ON SYS.DBMS_CRYPTO TO <schema>;
 --   plus APEX_MAIL usage (APEX workspace mapped to this schema) and an SMTP ACL if not using instance mail settings.
 -- Encoding: files contain Arabic text. Use a UTF-8 client:  export NLS_LANG=AMERICAN_AMERICA.AL32UTF8
--- Test data (10_test_data.sql) is NOT included: DEV/TEST only.
+-- Test data (10_test_data.sql) is NOT included: DEV/TEST only. After install run 17_bootstrap_sysadmin.sql once to create the first SYS_ADMIN.
 -- STATUS: written, NOT executed.
 -- =============================================================================
 WHENEVER SQLERROR EXIT FAILURE ROLLBACK

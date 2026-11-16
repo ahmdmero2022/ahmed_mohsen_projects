@@ -18,6 +18,7 @@ member has a body; the validation script's table list equals the DDL. **Not run:
 | `08_bodies_outcomes.sql` | certification, feedback, skill, reporting |
 | `09_seed_data.sql` | roles, permissions, role-permission matrix, categories, settings, 23 bilingual notification templates, certificate templates, feedback form, 7 scheduler jobs |
 | `10_test_data.sql` | DEV/TEST only: TD-1..TD-3 data |
+| `17_bootstrap_sysadmin.sql` | Run once after install: creates the first `SYS_ADMIN` (the application cannot grant it, as `GRANT_ROLE` needs `ROLE_ADMIN`); refuses if one already exists unless `FORCE`; audited |
 | `11_validation.sql` | PASS/FAIL checks (objects valid, tables, packages, key indexes, answer-key exposure, seeds, jobs, unindexed FKs) |
 | `12_rollback.sql` | Drops every LMS object in the current schema (`@12_rollback.sql YES`); destructive |
 | `13_apex_glue.sql` | `LMS_SECRET_PKG` (stub), `LMS_APEX_PKG` (authorization functions, post-auth, error handler, Ajax callbacks, signed content URLs, lesson renderer, file streaming), `LMS_ADMIN_PKG` (audited admin writes) |
