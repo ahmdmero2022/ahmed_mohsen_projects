@@ -35,4 +35,4 @@ set define on
 begin apex_application_install.clear_all; apex_application_install.set_workspace(upper('&WS.')); apex_application_install.set_schema(upper('&SCH.')); end;
 /
 @f240.sql
-prompt Done. Sign in at .../ords/r/<workspace>/lms/home (application 200).
+prompt Done. Sign in at .../ords/r/<workspace>/lms-learning/home (application 200).

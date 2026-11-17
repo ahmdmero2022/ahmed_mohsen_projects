@@ -6,7 +6,7 @@ TITLE = l10n('title', 'title')
 
 
 def build(base):
-    a = new_app(200, 'lms', 'LMS Learning Portal', base,
+    a = new_app(200, 'lms-learning', 'LMS Learning Portal', base,
                 schemes=('LMS_AUTH_CATALOG', 'LMS_AUTH_LEARNER', 'LMS_AUTH_INSTRUCTOR', 'LMS_AUTH_TRAINING_ADMIN',
                          'LMS_AUTH_MANAGER', 'LMS_AUTH_REPORT_ORG'),
                 static=('app.css', 'app-pages.css'))

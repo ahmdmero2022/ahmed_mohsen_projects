@@ -49,7 +49,7 @@ wwv_imp_workspace.create_flow(
 ,p_alias=>nvl(wwv_flow_application_install.get_application_alias,'LMS-MANAGER')
 ,p_page_view_logging=>'YES'
 ,p_page_protection_enabled_y_n=>'Y'
-,p_checksum_salt=>'A1F335E80800E3F4D2DB2C0A48586D9A28093A2B459702438732B2726DBD7C8C'
+,p_checksum_salt=>'9FFB19AF8E98F8EBC6B62369A48A90FDA0996EE8ACB6A2DA1C198535D426BDDF'
 ,p_bookmark_checksum_function=>'SH512'
 ,p_compatibility_mode=>'21.2'
 ,p_accessible_read_only=>'N'

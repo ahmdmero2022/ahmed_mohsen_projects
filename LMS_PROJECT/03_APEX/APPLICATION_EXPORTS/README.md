@@ -1,10 +1,27 @@
 # LMS application import files (Oracle APEX 24.1)
 
-Five application exports built on the database in `../../02_DATABASE` and the page specifications in `../PAGE_SPECIFICATIONS`.
+Built on the database in `../../02_DATABASE` and the page specifications in `../PAGE_SPECIFICATIONS`.
+
+## Option A (recommended): one application, `f500.sql`
+All five modules in a single application **500 "Enterprise LMS"**, alias `LMS-PORTAL`, 79 pages, one sign-in, one menu
+with a section per module (each section shows only to users with the matching role):
+
+| Section | Pages | Former app |
+|---|---|---|
+| Learning (everyone) | 1-99 | 200 |
+| Teaching | 101-151 | 210 (page n became 100 + n) |
+| Administration | 201-295 | 220 (200 + n) |
+| Management | 301-344 | 230 (300 + n) |
+| Analytics | 401-420 | 240 (400 + n) |
+
+Import: App Builder > Import > `f500.sql` (parsing schema = your LMS schema), or `@install_single_app.sql <WORKSPACE> <SCHEMA>`.
+Home page: `.../ords/r/<workspace>/lms-portal/home`. Session sharing between apps is not needed.
+
+## Option B: five separate applications
 
 | File | App | Alias | Pages | Audience |
 |---|---|---|---|---|
-| `f200.sql` | LMS Learning Portal | `LMS` | 22 | everyone |
+| `f200.sql` | LMS Learning Portal | `LMS-LEARNING` | 22 | everyone |
 | `f210.sql` | LMS Instructor Portal | `LMS-INSTRUCTOR` | 21 | instructors, training admins |
 | `f220.sql` | LMS Administration | `LMS-ADMIN` | 30 | training and system admins |
 | `f230.sql` | LMS Management | `LMS-MANAGER` | 12 | managers, HR |
@@ -45,7 +62,8 @@ apps uses 200-240.
 
 **SQLcl / SQL*Plus:** from this folder, `@install_apps.sql <WORKSPACE> <SCHEMA>`.
 
-Each file has its own id offset, so the five apps can live in one workspace next to your existing application.
+Each file has its own id offset and its own alias (none uses `LMS`, which your existing application 400 already has),
+so these apps can live in one workspace next to it. Install either Option A or Option B, not both.
 
 ## After importing (Shared Components)
 - **Session sharing between the five apps:** Authentication Schemes > Oracle APEX Accounts > Session Sharing >
@@ -74,8 +92,9 @@ The files are produced by `generator/` (Python 3 with `sqlglot`):
 ```
 cd generator
 python3 extract_db.py     # reads 02_DATABASE: view columns and package signatures
-python3 build.py ..       # writes ../f200.sql ... ../f240.sql and prints any issue found
+python3 build.py ..       # writes ../f500.sql and ../f200.sql ... ../f240.sql, prints any issue found
 python3 structcheck.py ../f*.sql
 ```
-Edit the page definitions in `app200.py` ... `app240.py`; shared parts are in `common.py` and `engine.py`.
+Edit the page definitions in `app200.py` ... `app240.py`; `appall.py` merges them into one application and renumbers
+pages, items and links; shared parts are in `common.py` and `engine.py`.
 `theme_ut42_base.sql` holds only the Universal Theme blocks (no application content).

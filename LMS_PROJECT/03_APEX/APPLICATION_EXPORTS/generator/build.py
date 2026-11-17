@@ -3,7 +3,7 @@ sys.path.insert(0, '.')
 import verify
 BASE = open('theme_ut42_base.sql', encoding='ascii').read()
 OUT = sys.argv[1]
-mods = sys.argv[2:] or ['app200', 'app210', 'app220', 'app230', 'app240']
+mods = sys.argv[2:] or ['appall', 'app200', 'app210', 'app220', 'app230', 'app240']
 total = 0
 for m in mods:
     app = importlib.import_module(m).build(BASE)

@@ -46,10 +46,10 @@ wwv_imp_workspace.create_flow(
  p_id=>wwv_flow.g_flow_id
 ,p_owner=>nvl(wwv_flow_application_install.get_schema,'LMS')
 ,p_name=>nvl(wwv_flow_application_install.get_application_name,'LMS Learning Portal')
-,p_alias=>nvl(wwv_flow_application_install.get_application_alias,'LMS')
+,p_alias=>nvl(wwv_flow_application_install.get_application_alias,'LMS-LEARNING')
 ,p_page_view_logging=>'YES'
 ,p_page_protection_enabled_y_n=>'Y'
-,p_checksum_salt=>'FFB6FBA6265801BD1B8A60EEA1E0DDECA07BA495207C7C1474005E146DB89276'
+,p_checksum_salt=>'28BCF6D3DAC65CDE105DC283D92854E664EB0E490812582E8E59E276FBFE697E'
 ,p_bookmark_checksum_function=>'SH512'
 ,p_compatibility_mode=>'21.2'
 ,p_accessible_read_only=>'N'
