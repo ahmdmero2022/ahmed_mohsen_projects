@@ -1,0 +1,53 @@
+/* =============================================================================
+   LMS page styles for the generated applications (Application static file: app-pages.css).
+   Loaded after app.css and uses its tokens. Logical properties only, so the Arabic (RTL) layout mirrors itself.
+   STATUS: written, not rendered in a browser.
+   ============================================================================= */
+
+/* KPI tile row (dashboards) - the tiles themselves are styled in app.css (.lms-kpi) */
+.lms-kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: var(--lms-gap); margin-block: 8px 16px; }
+.lms-welcome { font-size: 24px; font-weight: 700; margin-block: 0 8px; }
+.lms-fresh { color: var(--lms-text-muted); font-size: 13px; margin-block: 0 8px; }
+
+/* course header */
+.lms-hero { background: var(--lms-card); border: 1px solid var(--lms-border); border-radius: var(--lms-radius);
+            padding: 20px 24px; margin-block-end: var(--lms-gap); box-shadow: var(--lms-shadow); }
+.lms-hero h1 { font-size: 26px; margin: 0 0 6px; }
+.lms-hero__meta { color: var(--lms-text-muted); margin: 0; }
+
+/* course builder step navigation */
+.lms-builder-title { margin-block: 0 4px; }
+.lms-steps { display: flex; flex-wrap: wrap; gap: 4px 8px; padding-block: 4px 12px; border-block-end: 1px solid var(--lms-border);
+             margin-block-end: var(--lms-gap); }
+.lms-steps a { color: var(--lms-primary-dark); }
+
+/* learning player curriculum */
+.lms-module { font-size: 14px; font-weight: 700; color: var(--lms-text-muted); margin: 14px 16px 4px; text-transform: none; }
+
+/* assessments */
+.lms-quiz-status { color: var(--lms-text-muted); }
+.lms-question { border: 1px solid var(--lms-border); border-radius: var(--lms-radius); padding: 16px 20px; background: var(--lms-card); }
+.lms-question legend { font-size: 17px; font-weight: 600; padding-inline: 4px; }
+.lms-points { color: var(--lms-text-muted); font-weight: 400; font-size: 14px; }
+.lms-option { display: flex; gap: 10px; align-items: center; padding: 10px 12px; margin-block: 6px;
+              border: 1px solid var(--lms-border); border-radius: var(--lms-radius-sm); cursor: pointer; }
+.lms-option:hover { background: var(--lms-bg); }
+.lms-option input { inline-size: 18px; block-size: 18px; }
+.lms-match { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; margin-block: 8px; }
+.lms-result { font-size: 18px; font-weight: 700; padding: 12px 16px; border-radius: var(--lms-radius-sm); }
+.lms-result.is-pass { background: #DCFCE7; color: #14532D; }
+.lms-result.is-fail { background: #FEE2E2; color: #7F1D1D; }
+
+/* feedback questionnaire */
+.lms-fq { padding-block: 8px; border-block-end: 1px solid var(--lms-border); }
+
+/* certificate (print layout) */
+.lms-cert { max-inline-size: 900px; margin: 24px auto; padding: 48px; text-align: center; background: #fff;
+            border: 6px double var(--lms-secondary); }
+.lms-cert__kicker { letter-spacing: .08em; text-transform: uppercase; color: var(--lms-text-muted); }
+.lms-cert h1 { font-size: 34px; margin-block: 16px 8px; }
+.lms-cert h2 { font-size: 22px; font-weight: 600; margin-block: 0 16px; }
+@media print {
+  .t-Header, .t-Body-nav, .t-Footer, .u-hidden-print { display: none !important; }
+  .lms-cert { border-width: 4px; margin: 0; }
+}

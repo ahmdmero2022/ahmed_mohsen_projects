@@ -1,0 +1,4188 @@
+{
+"lms_util_pkg": {
+"get_setting": [
+{
+"kind": "FUNCTION",
+"ret": "VARCHAR2",
+"params": [
+{
+"n": "p_key",
+"mode": "IN",
+"def": false,
+"t": "p_key IN VARCHAR2"
+},
+{
+"n": "p_default",
+"mode": "IN",
+"def": true,
+"t": "p_default IN VARCHAR2 DEFAULT NULL"
+}
+],
+"acc": false
+}
+],
+"get_number": [
+{
+"kind": "FUNCTION",
+"ret": "NUMBER",
+"params": [
+{
+"n": "p_key",
+"mode": "IN",
+"def": false,
+"t": "p_key IN VARCHAR2"
+},
+{
+"n": "p_default",
+"mode": "IN",
+"def": true,
+"t": "p_default IN NUMBER"
+}
+],
+"acc": false
+}
+],
+"random_code": [
+{
+"kind": "FUNCTION",
+"ret": "VARCHAR2",
+"params": [
+{
+"n": "p_len",
+"mode": "IN",
+"def": false,
+"t": "p_len IN PLS_INTEGER"
+}
+],
+"acc": false
+}
+],
+"new_uuid": [
+{
+"kind": "FUNCTION",
+"ret": "VARCHAR2",
+"params": [],
+"acc": false
+}
+],
+"js": [
+{
+"kind": "FUNCTION",
+"ret": "VARCHAR2",
+"params": [
+{
+"n": "p_k1",
+"mode": "IN",
+"def": false,
+"t": "p_k1 IN VARCHAR2"
+},
+{
+"n": "p_v1",
+"mode": "IN",
+"def": false,
+"t": "p_v1 IN VARCHAR2"
+},
+{
+"n": "p_k2",
+"mode": "IN",
+"def": true,
+"t": "p_k2 IN VARCHAR2 DEFAULT NULL"
+},
+{
+"n": "p_v2",
+"mode": "IN",
+"def": true,
+"t": "p_v2 IN VARCHAR2 DEFAULT NULL"
+},
+{
+"n": "p_k3",
+"mode": "IN",
+"def": true,
+"t": "p_k3 IN VARCHAR2 DEFAULT NULL"
+},
+{
+"n": "p_v3",
+"mode": "IN",
+"def": true,
+"t": "p_v3 IN VARCHAR2 DEFAULT NULL"
+},
+{
+"n": "p_k4",
+"mode": "IN",
+"def": true,
+"t": "p_k4 IN VARCHAR2 DEFAULT NULL"
+},
+{
+"n": "p_v4",
+"mode": "IN",
+"def": true,
+"t": "p_v4 IN VARCHAR2 DEFAULT NULL"
+},
+{
+"n": "p_k5",
+"mode": "IN",
+"def": true,
+"t": "p_k5 IN VARCHAR2 DEFAULT NULL"
+},
+{
+"n": "p_v5",
+"mode": "IN",
+"def": true,
+"t": "p_v5 IN VARCHAR2 DEFAULT NULL"
+},
+{
+"n": "p_k6",
+"mode": "IN",
+"def": true,
+"t": "p_k6 IN VARCHAR2 DEFAULT NULL"
+},
+{
+"n": "p_v6",
+"mode": "IN",
+"def": true,
+"t": "p_v6 IN VARCHAR2 DEFAULT NULL"
+}
+],
+"acc": false
+}
+]
+},
+"lms_security_pkg": {
+"current_user_id": [
+{
+"kind": "FUNCTION",
+"ret": "NUMBER",
+"params": [],
+"acc": false
+}
+],
+"current_user_id_safe": [
+{
+"kind": "FUNCTION",
+"ret": "NUMBER",
+"params": [],
+"acc": false
+}
+],
+"has_permission": [
+{
+"kind": "FUNCTION",
+"ret": "BOOLEAN",
+"params": [
+{
+"n": "p_code",
+"mode": "IN",
+"def": false,
+"t": "p_code IN VARCHAR2"
+},
+{
+"n": "p_user_id",
+"mode": "IN",
+"def": true,
+"t": "p_user_id IN NUMBER DEFAULT NULL"
+}
+],
+"acc": false
+}
+],
+"require_permission": [
+{
+"kind": "PROCEDURE",
+"ret": null,
+"params": [
+{
+"n": "p_code",
+"mode": "IN",
+"def": false,
+"t": "p_code IN VARCHAR2"
+}
+],
+"acc": false
+}
+],
+"is_in_subtree": [
+{
+"kind": "FUNCTION",
+"ret": "BOOLEAN",
+"params": [
+{
+"n": "p_actor",
+"mode": "IN",
+"def": false,
+"t": "p_actor IN NUMBER"
+},
+{
+"n": "p_target",
+"mode": "IN",
+"def": false,
+"t": "p_target IN NUMBER"
+}
+],
+"acc": false
+}
+],
+"permission_scope": [
+{
+"kind": "FUNCTION",
+"ret": "VARCHAR2",
+"params": [
+{
+"n": "p_code",
+"mode": "IN",
+"def": false,
+"t": "p_code IN VARCHAR2"
+},
+{
+"n": "p_user_id",
+"mode": "IN",
+"def": true,
+"t": "p_user_id IN NUMBER DEFAULT NULL"
+}
+],
+"acc": false
+}
+],
+"can_manage_user": [
+{
+"kind": "FUNCTION",
+"ret": "BOOLEAN",
+"params": [
+{
+"n": "p_code",
+"mode": "IN",
+"def": false,
+"t": "p_code IN VARCHAR2"
+},
+{
+"n": "p_target_user",
+"mode": "IN",
+"def": false,
+"t": "p_target_user IN NUMBER"
+}
+],
+"acc": false
+}
+]
+},
+"lms_audit_pkg": {
+"log_event": [
+{
+"kind": "PROCEDURE",
+"ret": null,
+"params": [
+{
+"n": "p_operation",
+"mode": "IN",
+"def": false,
+"t": "p_operation IN VARCHAR2"
+},
+{
+"n": "p_entity",
+"mode": "IN",
+"def": false,
+"t": "p_entity IN VARCHAR2"
+},
+{
+"n": "p_entity_id",
+"mode": "IN",
+"def": true,
+"t": "p_entity_id IN NUMBER DEFAULT NULL"
+},
+{
+"n": "p_result",
+"mode": "IN",
+"def": true,
+"t": "p_result IN VARCHAR2 DEFAULT 'SUCCESS'"
+},
+{
+"n": "p_metadata",
+"mode": "IN",
+"def": true,
+"t": "p_metadata IN VARCHAR2 DEFAULT NULL"
+}
+],
+"acc": false
+}
+],
+"log_security": [
+{
+"kind": "PROCEDURE",
+"ret": null,
+"params": [
+{
+"n": "p_event_type",
+"mode": "IN",
+"def": false,
+"t": "p_event_type IN VARCHAR2"
+},
+{
+"n": "p_user_id",
+"mode": "IN",
+"def": true,
+"t": "p_user_id IN NUMBER DEFAULT NULL"
+},
+{
+"n": "p_subject_key",
+"mode": "IN",
+"def": true,
+"t": "p_subject_key IN VARCHAR2 DEFAULT NULL"
+},
+{
+"n": "p_operation",
+"mode": "IN",
+"def": true,
+"t": "p_operation IN VARCHAR2 DEFAULT NULL"
+},
+{
+"n": "p_severity",
+"mode": "IN",
+"def": true,
+"t": "p_severity IN VARCHAR2 DEFAULT 'INFO'"
+},
+{
+"n": "p_detail",
+"mode": "IN",
+"def": true,
+"t": "p_detail IN VARCHAR2 DEFAULT NULL"
+}
+],
+"acc": false
+}
+]
+},
+"lms_rate_limit_pkg": {
+"is_allowed": [
+{
+"kind": "FUNCTION",
+"ret": "BOOLEAN",
+"params": [
+{
+"n": "p_operation",
+"mode": "IN",
+"def": false,
+"t": "p_operation IN VARCHAR2"
+},
+{
+"n": "p_user_id",
+"mode": "IN",
+"def": true,
+"t": "p_user_id IN NUMBER DEFAULT NULL"
+},
+{
+"n": "p_client_key",
+"mode": "IN",
+"def": true,
+"t": "p_client_key IN VARCHAR2 DEFAULT NULL"
+}
+],
+"acc": false
+}
+],
+"enforce_limit": [
+{
+"kind": "PROCEDURE",
+"ret": null,
+"params": [
+{
+"n": "p_operation",
+"mode": "IN",
+"def": false,
+"t": "p_operation IN VARCHAR2"
+},
+{
+"n": "p_user_id",
+"mode": "IN",
+"def": true,
+"t": "p_user_id IN NUMBER DEFAULT NULL"
+},
+{
+"n": "p_client_key",
+"mode": "IN",
+"def": true,
+"t": "p_client_key IN VARCHAR2 DEFAULT NULL"
+}
+],
+"acc": false
+}
+],
+"check_and_record": [
+{
+"kind": "PROCEDURE",
+"ret": null,
+"params": [
+{
+"n": "p_operation",
+"mode": "IN",
+"def": false,
+"t": "p_operation IN VARCHAR2"
+},
+{
+"n": "p_user_id",
+"mode": "IN",
+"def": true,
+"t": "p_user_id IN NUMBER DEFAULT NULL"
+},
+{
+"n": "p_client_key",
+"mode": "IN",
+"def": true,
+"t": "p_client_key IN VARCHAR2 DEFAULT NULL"
+},
+{
+"n": "p_allowed",
+"mode": "OUT",
+"def": false,
+"t": "p_allowed OUT BOOLEAN"
+},
+{
+"n": "p_retry_after",
+"mode": "OUT",
+"def": false,
+"t": "p_retry_after OUT NUMBER"
+}
+],
+"acc": false
+}
+],
+"record_event": [
+{
+"kind": "PROCEDURE",
+"ret": null,
+"params": [
+{
+"n": "p_operation",
+"mode": "IN",
+"def": false,
+"t": "p_operation IN VARCHAR2"
+},
+{
+"n": "p_user_id",
+"mode": "IN",
+"def": true,
+"t": "p_user_id IN NUMBER DEFAULT NULL"
+},
+{
+"n": "p_client_key",
+"mode": "IN",
+"def": true,
+"t": "p_client_key IN VARCHAR2 DEFAULT NULL"
+}
+],
+"acc": false
+}
+],
+"purge_expired": [
+{
+"kind": "PROCEDURE",
+"ret": null,
+"params": [
+{
+"n": "p_batch",
+"mode": "IN",
+"def": true,
+"t": "p_batch IN NUMBER DEFAULT 10000"
+}
+],
+"acc": false
+}
+]
+},
+"lms_notification_pkg": {
+"enqueue": [
+{
+"kind": "PROCEDURE",
+"ret": null,
+"params": [
+{
+"n": "p_user_id",
+"mode": "IN",
+"def": false,
+"t": "p_user_id IN NUMBER"
+},
+{
+"n": "p_template_code",
+"mode": "IN",
+"def": false,
+"t": "p_template_code IN VARCHAR2"
+},
+{
+"n": "p_payload",
+"mode": "IN",
+"def": true,
+"t": "p_payload IN VARCHAR2 DEFAULT NULL"
+},
+{
+"n": "p_attach_kind",
+"mode": "IN",
+"def": true,
+"t": "p_attach_kind IN VARCHAR2 DEFAULT NULL"
+},
+{
+"n": "p_attach_ref",
+"mode": "IN",
+"def": true,
+"t": "p_attach_ref IN NUMBER DEFAULT NULL"
+},
+{
+"n": "p_attach_method",
+"mode": "IN",
+"def": true,
+"t": "p_attach_method IN VARCHAR2 DEFAULT NULL"
+}
+],
+"acc": false
+}
+],
+"process_queue": [
+{
+"kind": "PROCEDURE",
+"ret": null,
+"params": [
+{
+"n": "p_batch",
+"mode": "IN",
+"def": true,
+"t": "p_batch IN PLS_INTEGER DEFAULT 200"
+}
+],
+"acc": false
+}
+],
+"mark_read": [
+{
+"kind": "PROCEDURE",
+"ret": null,
+"params": [
+{
+"n": "p_notification_id",
+"mode": "IN",
+"def": false,
+"t": "p_notification_id IN NUMBER"
+}
+],
+"acc": false
+}
+],
+"mark_all_read": [
+{
+"kind": "PROCEDURE",
+"ret": null,
+"params": [],
+"acc": false
+}
+],
+"unread_count": [
+{
+"kind": "FUNCTION",
+"ret": "NUMBER",
+"params": [],
+"acc": false
+}
+]
+},
+"lms_approval_pkg": {
+"request_enrollment": [
+{
+"kind": "PROCEDURE",
+"ret": null,
+"params": [
+{
+"n": "p_enrollment_id",
+"mode": "IN",
+"def": false,
+"t": "p_enrollment_id IN NUMBER"
+},
+{
+"n": "p_requester_id",
+"mode": "IN",
+"def": false,
+"t": "p_requester_id IN NUMBER"
+}
+],
+"acc": true
+}
+],
+"request_course_publish": [
+{
+"kind": "PROCEDURE",
+"ret": null,
+"params": [
+{
+"n": "p_course_id",
+"mode": "IN",
+"def": false,
+"t": "p_course_id IN NUMBER"
+},
+{
+"n": "p_requester_id",
+"mode": "IN",
+"def": false,
+"t": "p_requester_id IN NUMBER"
+}
+],
+"acc": true
+}
+],
+"decide": [
+{
+"kind": "PROCEDURE",
+"ret": null,
+"params": [
+{
+"n": "p_approval_id",
+"mode": "IN",
+"def": false,
+"t": "p_approval_id IN NUMBER"
+},
+{
+"n": "p_decision",
+"mode": "IN",
+"def": false,
+"t": "p_decision IN VARCHAR2"
+},
+{
+"n": "p_note",
+"mode": "IN",
+"def": true,
+"t": "p_note IN VARCHAR2 DEFAULT NULL"
+}
+],
+"acc": false
+}
+],
+"escalate_overdue": [
+{
+"kind": "PROCEDURE",
+"ret": null,
+"params": [],
+"acc": false
+}
+]
+},
+"lms_user_pkg": {
+"grant_role": [
+{
+"kind": "PROCEDURE",
+"ret": null,
+"params": [
+{
+"n": "p_user_id",
+"mode": "IN",
+"def": false,
+"t": "p_user_id IN NUMBER"
+},
+{
+"n": "p_role_code",
+"mode": "IN",
+"def": false,
+"t": "p_role_code IN VARCHAR2"
+}
+],
+"acc": false
+}
+],
+"revoke_role": [
+{
+"kind": "PROCEDURE",
+"ret": null,
+"params": [
+{
+"n": "p_user_id",
+"mode": "IN",
+"def": false,
+"t": "p_user_id IN NUMBER"
+},
+{
+"n": "p_role_code",
+"mode": "IN",
+"def": false,
+"t": "p_role_code IN VARCHAR2"
+}
+],
+"acc": false
+}
+],
+"set_status": [
+{
+"kind": "PROCEDURE",
+"ret": null,
+"params": [
+{
+"n": "p_user_id",
+"mode": "IN",
+"def": false,
+"t": "p_user_id IN NUMBER"
+},
+{
+"n": "p_status",
+"mode": "IN",
+"def": false,
+"t": "p_status IN VARCHAR2"
+}
+],
+"acc": false
+}
+],
+"set_manager": [
+{
+"kind": "PROCEDURE",
+"ret": null,
+"params": [
+{
+"n": "p_user_id",
+"mode": "IN",
+"def": false,
+"t": "p_user_id IN NUMBER"
+},
+{
+"n": "p_manager_user_id",
+"mode": "IN",
+"def": false,
+"t": "p_manager_user_id IN NUMBER"
+}
+],
+"acc": false
+}
+],
+"set_language": [
+{
+"kind": "PROCEDURE",
+"ret": null,
+"params": [
+{
+"n": "p_lang",
+"mode": "IN",
+"def": false,
+"t": "p_lang IN VARCHAR2"
+}
+],
+"acc": false
+}
+],
+"would_cycle": [
+{
+"kind": "FUNCTION",
+"ret": "BOOLEAN",
+"params": [
+{
+"n": "p_user_id",
+"mode": "IN",
+"def": false,
+"t": "p_user_id IN NUMBER"
+},
+{
+"n": "p_manager_user_id",
+"mode": "IN",
+"def": false,
+"t": "p_manager_user_id IN NUMBER"
+}
+],
+"acc": false
+}
+]
+},
+"lms_hr_sync_pkg": {
+"upsert_employee": [
+{
+"kind": "PROCEDURE",
+"ret": null,
+"params": [
+{
+"n": "p_username",
+"mode": "IN",
+"def": false,
+"t": "p_username IN VARCHAR2"
+},
+{
+"n": "p_employee_no",
+"mode": "IN",
+"def": false,
+"t": "p_employee_no IN VARCHAR2"
+},
+{
+"n": "p_name_en",
+"mode": "IN",
+"def": false,
+"t": "p_name_en IN VARCHAR2"
+},
+{
+"n": "p_name_ar",
+"mode": "IN",
+"def": false,
+"t": "p_name_ar IN VARCHAR2"
+},
+{
+"n": "p_email",
+"mode": "IN",
+"def": false,
+"t": "p_email IN VARCHAR2"
+},
+{
+"n": "p_department_code",
+"mode": "IN",
+"def": false,
+"t": "p_department_code IN VARCHAR2"
+},
+{
+"n": "p_position_code",
+"mode": "IN",
+"def": false,
+"t": "p_position_code IN VARCHAR2"
+},
+{
+"n": "p_manager_employee_no",
+"mode": "IN",
+"def": false,
+"t": "p_manager_employee_no IN VARCHAR2"
+},
+{
+"n": "p_status",
+"mode": "IN",
+"def": true,
+"t": "p_status IN VARCHAR2 DEFAULT 'ACTIVE'"
+}
+],
+"acc": false
+}
+]
+},
+"lms_course_pkg": {
+"can_manage_course": [
+{
+"kind": "FUNCTION",
+"ret": "BOOLEAN",
+"params": [
+{
+"n": "p_course_id",
+"mode": "IN",
+"def": false,
+"t": "p_course_id IN NUMBER"
+},
+{
+"n": "p_permission",
+"mode": "IN",
+"def": false,
+"t": "p_permission IN VARCHAR2"
+}
+],
+"acc": false
+}
+],
+"create_course": [
+{
+"kind": "FUNCTION",
+"ret": "NUMBER",
+"params": [
+{
+"n": "p_course_code",
+"mode": "IN",
+"def": false,
+"t": "p_course_code IN VARCHAR2"
+},
+{
+"n": "p_title_en",
+"mode": "IN",
+"def": false,
+"t": "p_title_en IN VARCHAR2"
+},
+{
+"n": "p_title_ar",
+"mode": "IN",
+"def": false,
+"t": "p_title_ar IN VARCHAR2"
+},
+{
+"n": "p_category_id",
+"mode": "IN",
+"def": false,
+"t": "p_category_id IN NUMBER"
+},
+{
+"n": "p_delivery_method",
+"mode": "IN",
+"def": false,
+"t": "p_delivery_method IN VARCHAR2"
+},
+{
+"n": "p_difficulty",
+"mode": "IN",
+"def": true,
+"t": "p_difficulty IN VARCHAR2 DEFAULT 'BEGINNER'"
+},
+{
+"n": "p_duration_minutes",
+"mode": "IN",
+"def": true,
+"t": "p_duration_minutes IN NUMBER DEFAULT 0"
+},
+{
+"n": "p_language_code",
+"mode": "IN",
+"def": true,
+"t": "p_language_code IN VARCHAR2 DEFAULT 'en'"
+},
+{
+"n": "p_capacity",
+"mode": "IN",
+"def": true,
+"t": "p_capacity IN NUMBER DEFAULT NULL"
+},
+{
+"n": "p_approval_required",
+"mode": "IN",
+"def": true,
+"t": "p_approval_required IN VARCHAR2 DEFAULT 'N'"
+},
+{
+"n": "p_completion_rule",
+"mode": "IN",
+"def": true,
+"t": "p_completion_rule IN VARCHAR2 DEFAULT 'LESSONS'"
+},
+{
+"n": "p_certificate_eligible",
+"mode": "IN",
+"def": true,
+"t": "p_certificate_eligible IN VARCHAR2 DEFAULT 'N'"
+}
+],
+"acc": false
+}
+],
+"update_course": [
+{
+"kind": "PROCEDURE",
+"ret": null,
+"params": [
+{
+"n": "p_course_id",
+"mode": "IN",
+"def": false,
+"t": "p_course_id IN NUMBER"
+},
+{
+"n": "p_row_version",
+"mode": "IN",
+"def": false,
+"t": "p_row_version IN NUMBER"
+},
+{
+"n": "p_title_en",
+"mode": "IN",
+"def": false,
+"t": "p_title_en IN VARCHAR2"
+},
+{
+"n": "p_title_ar",
+"mode": "IN",
+"def": false,
+"t": "p_title_ar IN VARCHAR2"
+},
+{
+"n": "p_category_id",
+"mode": "IN",
+"def": false,
+"t": "p_category_id IN NUMBER"
+},
+{
+"n": "p_difficulty",
+"mode": "IN",
+"def": false,
+"t": "p_difficulty IN VARCHAR2"
+},
+{
+"n": "p_duration_minutes",
+"mode": "IN",
+"def": false,
+"t": "p_duration_minutes IN NUMBER"
+},
+{
+"n": "p_capacity",
+"mode": "IN",
+"def": false,
+"t": "p_capacity IN NUMBER"
+},
+{
+"n": "p_approval_required",
+"mode": "IN",
+"def": false,
+"t": "p_approval_required IN VARCHAR2"
+},
+{
+"n": "p_completion_rule",
+"mode": "IN",
+"def": false,
+"t": "p_completion_rule IN VARCHAR2"
+},
+{
+"n": "p_certificate_eligible",
+"mode": "IN",
+"def": false,
+"t": "p_certificate_eligible IN VARCHAR2"
+},
+{
+"n": "p_available_from",
+"mode": "IN",
+"def": true,
+"t": "p_available_from IN DATE DEFAULT NULL"
+},
+{
+"n": "p_available_to",
+"mode": "IN",
+"def": true,
+"t": "p_available_to IN DATE DEFAULT NULL"
+},
+{
+"n": "p_enroll_deadline",
+"mode": "IN",
+"def": true,
+"t": "p_enroll_deadline IN DATE DEFAULT NULL"
+}
+],
+"acc": false
+}
+],
+"add_module": [
+{
+"kind": "FUNCTION",
+"ret": "NUMBER",
+"params": [
+{
+"n": "p_course_id",
+"mode": "IN",
+"def": false,
+"t": "p_course_id IN NUMBER"
+},
+{
+"n": "p_title_en",
+"mode": "IN",
+"def": false,
+"t": "p_title_en IN VARCHAR2"
+},
+{
+"n": "p_title_ar",
+"mode": "IN",
+"def": true,
+"t": "p_title_ar IN VARCHAR2 DEFAULT NULL"
+}
+],
+"acc": false
+}
+],
+"add_lesson": [
+{
+"kind": "FUNCTION",
+"ret": "NUMBER",
+"params": [
+{
+"n": "p_module_id",
+"mode": "IN",
+"def": false,
+"t": "p_module_id IN NUMBER"
+},
+{
+"n": "p_title_en",
+"mode": "IN",
+"def": false,
+"t": "p_title_en IN VARCHAR2"
+},
+{
+"n": "p_lesson_type",
+"mode": "IN",
+"def": false,
+"t": "p_lesson_type IN VARCHAR2"
+},
+{
+"n": "p_title_ar",
+"mode": "IN",
+"def": true,
+"t": "p_title_ar IN VARCHAR2 DEFAULT NULL"
+},
+{
+"n": "p_content_ref",
+"mode": "IN",
+"def": true,
+"t": "p_content_ref IN VARCHAR2 DEFAULT NULL"
+},
+{
+"n": "p_duration_minutes",
+"mode": "IN",
+"def": true,
+"t": "p_duration_minutes IN NUMBER DEFAULT 0"
+},
+{
+"n": "p_required_flag",
+"mode": "IN",
+"def": true,
+"t": "p_required_flag IN VARCHAR2 DEFAULT 'Y'"
+},
+{
+"n": "p_prereq_lesson_id",
+"mode": "IN",
+"def": true,
+"t": "p_prereq_lesson_id IN NUMBER DEFAULT NULL"
+}
+],
+"acc": false
+}
+],
+"add_prerequisite": [
+{
+"kind": "PROCEDURE",
+"ret": null,
+"params": [
+{
+"n": "p_course_id",
+"mode": "IN",
+"def": false,
+"t": "p_course_id IN NUMBER"
+},
+{
+"n": "p_prereq_course_id",
+"mode": "IN",
+"def": false,
+"t": "p_prereq_course_id IN NUMBER"
+}
+],
+"acc": false
+}
+],
+"set_instructor": [
+{
+"kind": "PROCEDURE",
+"ret": null,
+"params": [
+{
+"n": "p_course_id",
+"mode": "IN",
+"def": false,
+"t": "p_course_id IN NUMBER"
+},
+{
+"n": "p_user_id",
+"mode": "IN",
+"def": false,
+"t": "p_user_id IN NUMBER"
+},
+{
+"n": "p_role",
+"mode": "IN",
+"def": true,
+"t": "p_role IN VARCHAR2 DEFAULT 'LEAD'"
+}
+],
+"acc": false
+}
+],
+"set_certificate_template": [
+{
+"kind": "PROCEDURE",
+"ret": null,
+"params": [
+{
+"n": "p_course_id",
+"mode": "IN",
+"def": false,
+"t": "p_course_id IN NUMBER"
+},
+{
+"n": "p_template_id",
+"mode": "IN",
+"def": false,
+"t": "p_template_id IN NUMBER"
+}
+],
+"acc": false
+}
+],
+"validate_publishable": [
+{
+"kind": "FUNCTION",
+"ret": "VARCHAR2",
+"params": [
+{
+"n": "p_course_id",
+"mode": "IN",
+"def": false,
+"t": "p_course_id IN NUMBER"
+}
+],
+"acc": false
+}
+],
+"submit_for_review": [
+{
+"kind": "PROCEDURE",
+"ret": null,
+"params": [
+{
+"n": "p_course_id",
+"mode": "IN",
+"def": false,
+"t": "p_course_id IN NUMBER"
+}
+],
+"acc": false
+}
+],
+"apply_review": [
+{
+"kind": "PROCEDURE",
+"ret": null,
+"params": [
+{
+"n": "p_course_id",
+"mode": "IN",
+"def": false,
+"t": "p_course_id IN NUMBER"
+},
+{
+"n": "p_approved",
+"mode": "IN",
+"def": false,
+"t": "p_approved IN BOOLEAN"
+},
+{
+"n": "p_note",
+"mode": "IN",
+"def": true,
+"t": "p_note IN VARCHAR2 DEFAULT NULL"
+}
+],
+"acc": true
+}
+],
+"set_course_text": [
+{
+"kind": "PROCEDURE",
+"ret": null,
+"params": [
+{
+"n": "p_course_id",
+"mode": "IN",
+"def": false,
+"t": "p_course_id IN NUMBER"
+},
+{
+"n": "p_row_version",
+"mode": "IN",
+"def": false,
+"t": "p_row_version IN NUMBER"
+},
+{
+"n": "p_description_en",
+"mode": "IN",
+"def": false,
+"t": "p_description_en IN CLOB"
+},
+{
+"n": "p_description_ar",
+"mode": "IN",
+"def": false,
+"t": "p_description_ar IN CLOB"
+},
+{
+"n": "p_objectives_en",
+"mode": "IN",
+"def": false,
+"t": "p_objectives_en IN VARCHAR2"
+},
+{
+"n": "p_objectives_ar",
+"mode": "IN",
+"def": false,
+"t": "p_objectives_ar IN VARCHAR2"
+},
+{
+"n": "p_thumbnail_ref",
+"mode": "IN",
+"def": false,
+"t": "p_thumbnail_ref IN VARCHAR2"
+}
+],
+"acc": false
+}
+],
+"set_lesson_content": [
+{
+"kind": "PROCEDURE",
+"ret": null,
+"params": [
+{
+"n": "p_lesson_id",
+"mode": "IN",
+"def": false,
+"t": "p_lesson_id IN NUMBER"
+},
+{
+"n": "p_content_ref",
+"mode": "IN",
+"def": false,
+"t": "p_content_ref IN VARCHAR2"
+},
+{
+"n": "p_content_text",
+"mode": "IN",
+"def": false,
+"t": "p_content_text IN VARCHAR2"
+}
+],
+"acc": false
+}
+],
+"update_module": [
+{
+"kind": "PROCEDURE",
+"ret": null,
+"params": [
+{
+"n": "p_module_id",
+"mode": "IN",
+"def": false,
+"t": "p_module_id IN NUMBER"
+},
+{
+"n": "p_title_en",
+"mode": "IN",
+"def": false,
+"t": "p_title_en IN VARCHAR2"
+},
+{
+"n": "p_title_ar",
+"mode": "IN",
+"def": false,
+"t": "p_title_ar IN VARCHAR2"
+}
+],
+"acc": false
+}
+],
+"update_lesson": [
+{
+"kind": "PROCEDURE",
+"ret": null,
+"params": [
+{
+"n": "p_lesson_id",
+"mode": "IN",
+"def": false,
+"t": "p_lesson_id IN NUMBER"
+},
+{
+"n": "p_title_en",
+"mode": "IN",
+"def": false,
+"t": "p_title_en IN VARCHAR2"
+},
+{
+"n": "p_title_ar",
+"mode": "IN",
+"def": false,
+"t": "p_title_ar IN VARCHAR2"
+},
+{
+"n": "p_lesson_type",
+"mode": "IN",
+"def": false,
+"t": "p_lesson_type IN VARCHAR2"
+},
+{
+"n": "p_duration_minutes",
+"mode": "IN",
+"def": false,
+"t": "p_duration_minutes IN NUMBER"
+},
+{
+"n": "p_required_flag",
+"mode": "IN",
+"def": false,
+"t": "p_required_flag IN VARCHAR2"
+},
+{
+"n": "p_prereq_lesson_id",
+"mode": "IN",
+"def": false,
+"t": "p_prereq_lesson_id IN NUMBER"
+},
+{
+"n": "p_available_from",
+"mode": "IN",
+"def": true,
+"t": "p_available_from IN DATE DEFAULT NULL"
+}
+],
+"acc": false
+}
+],
+"add_lesson_file": [
+{
+"kind": "PROCEDURE",
+"ret": null,
+"params": [
+{
+"n": "p_lesson_id",
+"mode": "IN",
+"def": false,
+"t": "p_lesson_id IN NUMBER"
+},
+{
+"n": "p_file_name",
+"mode": "IN",
+"def": false,
+"t": "p_file_name IN VARCHAR2"
+},
+{
+"n": "p_mime_type",
+"mode": "IN",
+"def": false,
+"t": "p_mime_type IN VARCHAR2"
+},
+{
+"n": "p_blob",
+"mode": "IN",
+"def": false,
+"t": "p_blob IN BLOB"
+}
+],
+"acc": false
+}
+],
+"move_module": [
+{
+"kind": "PROCEDURE",
+"ret": null,
+"params": [
+{
+"n": "p_module_id",
+"mode": "IN",
+"def": false,
+"t": "p_module_id IN NUMBER"
+},
+{
+"n": "p_direction",
+"mode": "IN",
+"def": false,
+"t": "p_direction IN VARCHAR2"
+}
+],
+"acc": false
+}
+],
+"move_lesson": [
+{
+"kind": "PROCEDURE",
+"ret": null,
+"params": [
+{
+"n": "p_lesson_id",
+"mode": "IN",
+"def": false,
+"t": "p_lesson_id IN NUMBER"
+},
+{
+"n": "p_direction",
+"mode": "IN",
+"def": false,
+"t": "p_direction IN VARCHAR2"
+}
+],
+"acc": false
+}
+],
+"remove_module": [
+{
+"kind": "PROCEDURE",
+"ret": null,
+"params": [
+{
+"n": "p_module_id",
+"mode": "IN",
+"def": false,
+"t": "p_module_id IN NUMBER"
+}
+],
+"acc": false
+}
+],
+"remove_lesson": [
+{
+"kind": "PROCEDURE",
+"ret": null,
+"params": [
+{
+"n": "p_lesson_id",
+"mode": "IN",
+"def": false,
+"t": "p_lesson_id IN NUMBER"
+}
+],
+"acc": false
+}
+],
+"suspend": [
+{
+"kind": "PROCEDURE",
+"ret": null,
+"params": [
+{
+"n": "p_course_id",
+"mode": "IN",
+"def": false,
+"t": "p_course_id IN NUMBER"
+}
+],
+"acc": false
+}
+],
+"reinstate": [
+{
+"kind": "PROCEDURE",
+"ret": null,
+"params": [
+{
+"n": "p_course_id",
+"mode": "IN",
+"def": false,
+"t": "p_course_id IN NUMBER"
+}
+],
+"acc": false
+}
+],
+"archive": [
+{
+"kind": "PROCEDURE",
+"ret": null,
+"params": [
+{
+"n": "p_course_id",
+"mode": "IN",
+"def": false,
+"t": "p_course_id IN NUMBER"
+}
+],
+"acc": false
+}
+]
+},
+"lms_enrollment_pkg": {
+"enroll_self": [
+{
+"kind": "PROCEDURE",
+"ret": null,
+"params": [
+{
+"n": "p_course_id",
+"mode": "IN",
+"def": false,
+"t": "p_course_id IN NUMBER"
+},
+{
+"n": "p_enrollment_id",
+"mode": "OUT",
+"def": false,
+"t": "p_enrollment_id OUT NUMBER"
+},
+{
+"n": "p_status",
+"mode": "OUT",
+"def": false,
+"t": "p_status OUT VARCHAR2"
+}
+],
+"acc": false
+}
+],
+"assign": [
+{
+"kind": "PROCEDURE",
+"ret": null,
+"params": [
+{
+"n": "p_user_id",
+"mode": "IN",
+"def": false,
+"t": "p_user_id IN NUMBER"
+},
+{
+"n": "p_course_id",
+"mode": "IN",
+"def": false,
+"t": "p_course_id IN NUMBER"
+},
+{
+"n": "p_due_date",
+"mode": "IN",
+"def": true,
+"t": "p_due_date IN DATE DEFAULT NULL"
+},
+{
+"n": "p_type",
+"mode": "IN",
+"def": true,
+"t": "p_type IN VARCHAR2 DEFAULT 'ADMIN'"
+},
+{
+"n": "p_enrollment_id",
+"mode": "OUT",
+"def": false,
+"t": "p_enrollment_id OUT NUMBER"
+},
+{
+"n": "p_status",
+"mode": "OUT",
+"def": false,
+"t": "p_status OUT VARCHAR2"
+}
+],
+"acc": false
+}
+],
+"cancel": [
+{
+"kind": "PROCEDURE",
+"ret": null,
+"params": [
+{
+"n": "p_enrollment_id",
+"mode": "IN",
+"def": false,
+"t": "p_enrollment_id IN NUMBER"
+}
+],
+"acc": false
+}
+],
+"promote_waitlist": [
+{
+"kind": "PROCEDURE",
+"ret": null,
+"params": [
+{
+"n": "p_course_id",
+"mode": "IN",
+"def": false,
+"t": "p_course_id IN NUMBER"
+}
+],
+"acc": false
+}
+],
+"create_assignment": [
+{
+"kind": "FUNCTION",
+"ret": "NUMBER",
+"params": [
+{
+"n": "p_course_id",
+"mode": "IN",
+"def": false,
+"t": "p_course_id IN NUMBER"
+},
+{
+"n": "p_target_type",
+"mode": "IN",
+"def": false,
+"t": "p_target_type IN VARCHAR2"
+},
+{
+"n": "p_target_id",
+"mode": "IN",
+"def": false,
+"t": "p_target_id IN NUMBER"
+},
+{
+"n": "p_due_date",
+"mode": "IN",
+"def": false,
+"t": "p_due_date IN DATE"
+}
+],
+"acc": false
+}
+],
+"close_assignment": [
+{
+"kind": "PROCEDURE",
+"ret": null,
+"params": [
+{
+"n": "p_assignment_id",
+"mode": "IN",
+"def": false,
+"t": "p_assignment_id IN NUMBER"
+}
+],
+"acc": false
+}
+],
+"sync_assignments": [
+{
+"kind": "PROCEDURE",
+"ret": null,
+"params": [],
+"acc": false
+}
+],
+"apply_approval": [
+{
+"kind": "PROCEDURE",
+"ret": null,
+"params": [
+{
+"n": "p_enrollment_id",
+"mode": "IN",
+"def": false,
+"t": "p_enrollment_id IN NUMBER"
+},
+{
+"n": "p_approved",
+"mode": "IN",
+"def": false,
+"t": "p_approved IN BOOLEAN"
+}
+],
+"acc": true
+}
+],
+"start_renewal": [
+{
+"kind": "PROCEDURE",
+"ret": null,
+"params": [
+{
+"n": "p_user_id",
+"mode": "IN",
+"def": false,
+"t": "p_user_id IN NUMBER"
+},
+{
+"n": "p_course_id",
+"mode": "IN",
+"def": false,
+"t": "p_course_id IN NUMBER"
+},
+{
+"n": "p_due_date",
+"mode": "IN",
+"def": false,
+"t": "p_due_date IN DATE"
+}
+],
+"acc": true
+}
+]
+},
+"lms_progress_pkg": {
+"record_event": [
+{
+"kind": "PROCEDURE",
+"ret": null,
+"params": [
+{
+"n": "p_enrollment_id",
+"mode": "IN",
+"def": false,
+"t": "p_enrollment_id IN NUMBER"
+},
+{
+"n": "p_lesson_id",
+"mode": "IN",
+"def": false,
+"t": "p_lesson_id IN NUMBER"
+},
+{
+"n": "p_event_type",
+"mode": "IN",
+"def": false,
+"t": "p_event_type IN VARCHAR2"
+},
+{
+"n": "p_event_uuid",
+"mode": "IN",
+"def": false,
+"t": "p_event_uuid IN VARCHAR2"
+},
+{
+"n": "p_position",
+"mode": "IN",
+"def": true,
+"t": "p_position IN NUMBER DEFAULT 0"
+},
+{
+"n": "p_seconds",
+"mode": "IN",
+"def": true,
+"t": "p_seconds IN NUMBER DEFAULT 0"
+},
+{
+"n": "p_progress_pct",
+"mode": "OUT",
+"def": false,
+"t": "p_progress_pct OUT NUMBER"
+},
+{
+"n": "p_status",
+"mode": "OUT",
+"def": false,
+"t": "p_status OUT VARCHAR2"
+}
+],
+"acc": false
+}
+],
+"get_resume_position": [
+{
+"kind": "FUNCTION",
+"ret": "NUMBER",
+"params": [
+{
+"n": "p_enrollment_id",
+"mode": "IN",
+"def": false,
+"t": "p_enrollment_id IN NUMBER"
+},
+{
+"n": "p_lesson_id",
+"mode": "IN",
+"def": false,
+"t": "p_lesson_id IN NUMBER"
+}
+],
+"acc": false
+}
+],
+"approve_completion": [
+{
+"kind": "PROCEDURE",
+"ret": null,
+"params": [
+{
+"n": "p_enrollment_id",
+"mode": "IN",
+"def": false,
+"t": "p_enrollment_id IN NUMBER"
+}
+],
+"acc": false
+}
+],
+"complete_lesson_system": [
+{
+"kind": "PROCEDURE",
+"ret": null,
+"params": [
+{
+"n": "p_enrollment_id",
+"mode": "IN",
+"def": false,
+"t": "p_enrollment_id IN NUMBER"
+},
+{
+"n": "p_lesson_id",
+"mode": "IN",
+"def": false,
+"t": "p_lesson_id IN NUMBER"
+}
+],
+"acc": true
+}
+],
+"evaluate_completion": [
+{
+"kind": "PROCEDURE",
+"ret": null,
+"params": [
+{
+"n": "p_enrollment_id",
+"mode": "IN",
+"def": false,
+"t": "p_enrollment_id IN NUMBER"
+}
+],
+"acc": true
+}
+]
+},
+"lms_assessment_pkg": {
+"create_quiz": [
+{
+"kind": "FUNCTION",
+"ret": "NUMBER",
+"params": [
+{
+"n": "p_course_id",
+"mode": "IN",
+"def": false,
+"t": "p_course_id IN NUMBER"
+},
+{
+"n": "p_title_en",
+"mode": "IN",
+"def": false,
+"t": "p_title_en IN VARCHAR2"
+},
+{
+"n": "p_pass_score",
+"mode": "IN",
+"def": true,
+"t": "p_pass_score IN NUMBER DEFAULT 70"
+},
+{
+"n": "p_time_limit_min",
+"mode": "IN",
+"def": true,
+"t": "p_time_limit_min IN NUMBER DEFAULT NULL"
+},
+{
+"n": "p_max_attempts",
+"mode": "IN",
+"def": true,
+"t": "p_max_attempts IN NUMBER DEFAULT 3"
+},
+{
+"n": "p_lesson_id",
+"mode": "IN",
+"def": true,
+"t": "p_lesson_id IN NUMBER DEFAULT NULL"
+}
+],
+"acc": false
+}
+],
+"link_question": [
+{
+"kind": "PROCEDURE",
+"ret": null,
+"params": [
+{
+"n": "p_quiz_id",
+"mode": "IN",
+"def": false,
+"t": "p_quiz_id IN NUMBER"
+},
+{
+"n": "p_question_id",
+"mode": "IN",
+"def": false,
+"t": "p_question_id IN NUMBER"
+},
+{
+"n": "p_sort_order",
+"mode": "IN",
+"def": true,
+"t": "p_sort_order IN NUMBER DEFAULT 0"
+}
+],
+"acc": false
+}
+],
+"update_quiz": [
+{
+"kind": "PROCEDURE",
+"ret": null,
+"params": [
+{
+"n": "p_quiz_id",
+"mode": "IN",
+"def": false,
+"t": "p_quiz_id IN NUMBER"
+},
+{
+"n": "p_title_en",
+"mode": "IN",
+"def": false,
+"t": "p_title_en IN VARCHAR2"
+},
+{
+"n": "p_title_ar",
+"mode": "IN",
+"def": false,
+"t": "p_title_ar IN VARCHAR2"
+},
+{
+"n": "p_pass_score",
+"mode": "IN",
+"def": false,
+"t": "p_pass_score IN NUMBER"
+},
+{
+"n": "p_time_limit_min",
+"mode": "IN",
+"def": false,
+"t": "p_time_limit_min IN NUMBER"
+},
+{
+"n": "p_max_attempts",
+"mode": "IN",
+"def": false,
+"t": "p_max_attempts IN NUMBER"
+},
+{
+"n": "p_question_count",
+"mode": "IN",
+"def": false,
+"t": "p_question_count IN NUMBER"
+},
+{
+"n": "p_randomize_q",
+"mode": "IN",
+"def": false,
+"t": "p_randomize_q IN VARCHAR2"
+},
+{
+"n": "p_randomize_a",
+"mode": "IN",
+"def": false,
+"t": "p_randomize_a IN VARCHAR2"
+},
+{
+"n": "p_show_review",
+"mode": "IN",
+"def": false,
+"t": "p_show_review IN VARCHAR2"
+},
+{
+"n": "p_required_flag",
+"mode": "IN",
+"def": false,
+"t": "p_required_flag IN VARCHAR2"
+},
+{
+"n": "p_available_from",
+"mode": "IN",
+"def": false,
+"t": "p_available_from IN DATE"
+},
+{
+"n": "p_available_to",
+"mode": "IN",
+"def": false,
+"t": "p_available_to IN DATE"
+},
+{
+"n": "p_active_flag",
+"mode": "IN",
+"def": false,
+"t": "p_active_flag IN VARCHAR2"
+},
+{
+"n": "p_lesson_id",
+"mode": "IN",
+"def": true,
+"t": "p_lesson_id IN NUMBER DEFAULT NULL"
+}
+],
+"acc": false
+}
+],
+"unlink_question": [
+{
+"kind": "PROCEDURE",
+"ret": null,
+"params": [
+{
+"n": "p_quiz_id",
+"mode": "IN",
+"def": false,
+"t": "p_quiz_id IN NUMBER"
+},
+{
+"n": "p_question_id",
+"mode": "IN",
+"def": false,
+"t": "p_question_id IN NUMBER"
+}
+],
+"acc": false
+}
+],
+"create_bank": [
+{
+"kind": "FUNCTION",
+"ret": "NUMBER",
+"params": [
+{
+"n": "p_name_en",
+"mode": "IN",
+"def": false,
+"t": "p_name_en IN VARCHAR2"
+},
+{
+"n": "p_name_ar",
+"mode": "IN",
+"def": true,
+"t": "p_name_ar IN VARCHAR2 DEFAULT NULL"
+}
+],
+"acc": false
+}
+],
+"save_question": [
+{
+"kind": "FUNCTION",
+"ret": "NUMBER",
+"params": [
+{
+"n": "p_question_id",
+"mode": "IN",
+"def": false,
+"t": "p_question_id IN NUMBER"
+},
+{
+"n": "p_bank_id",
+"mode": "IN",
+"def": false,
+"t": "p_bank_id IN NUMBER"
+},
+{
+"n": "p_question_type",
+"mode": "IN",
+"def": false,
+"t": "p_question_type IN VARCHAR2"
+},
+{
+"n": "p_text_en",
+"mode": "IN",
+"def": false,
+"t": "p_text_en IN VARCHAR2"
+},
+{
+"n": "p_text_ar",
+"mode": "IN",
+"def": false,
+"t": "p_text_ar IN VARCHAR2"
+},
+{
+"n": "p_points",
+"mode": "IN",
+"def": false,
+"t": "p_points IN NUMBER"
+},
+{
+"n": "p_active_flag",
+"mode": "IN",
+"def": false,
+"t": "p_active_flag IN VARCHAR2"
+}
+],
+"acc": false
+}
+],
+"save_option": [
+{
+"kind": "FUNCTION",
+"ret": "NUMBER",
+"params": [
+{
+"n": "p_option_id",
+"mode": "IN",
+"def": false,
+"t": "p_option_id IN NUMBER"
+},
+{
+"n": "p_question_id",
+"mode": "IN",
+"def": false,
+"t": "p_question_id IN NUMBER"
+},
+{
+"n": "p_text_en",
+"mode": "IN",
+"def": false,
+"t": "p_text_en IN VARCHAR2"
+},
+{
+"n": "p_text_ar",
+"mode": "IN",
+"def": false,
+"t": "p_text_ar IN VARCHAR2"
+},
+{
+"n": "p_is_correct",
+"mode": "IN",
+"def": false,
+"t": "p_is_correct IN VARCHAR2"
+},
+{
+"n": "p_match_key",
+"mode": "IN",
+"def": false,
+"t": "p_match_key IN VARCHAR2"
+},
+{
+"n": "p_sort_order",
+"mode": "IN",
+"def": true,
+"t": "p_sort_order IN NUMBER DEFAULT 0"
+}
+],
+"acc": false
+}
+],
+"remove_option": [
+{
+"kind": "PROCEDURE",
+"ret": null,
+"params": [
+{
+"n": "p_option_id",
+"mode": "IN",
+"def": false,
+"t": "p_option_id IN NUMBER"
+}
+],
+"acc": false
+}
+],
+"remove_question": [
+{
+"kind": "PROCEDURE",
+"ret": null,
+"params": [
+{
+"n": "p_question_id",
+"mode": "IN",
+"def": false,
+"t": "p_question_id IN NUMBER"
+}
+],
+"acc": false
+}
+],
+"clone_question": [
+{
+"kind": "FUNCTION",
+"ret": "NUMBER",
+"params": [
+{
+"n": "p_question_id",
+"mode": "IN",
+"def": false,
+"t": "p_question_id IN NUMBER"
+}
+],
+"acc": false
+}
+],
+"validate_quiz": [
+{
+"kind": "FUNCTION",
+"ret": "VARCHAR2",
+"params": [
+{
+"n": "p_quiz_id",
+"mode": "IN",
+"def": false,
+"t": "p_quiz_id IN NUMBER"
+}
+],
+"acc": false
+}
+],
+"start_attempt": [
+{
+"kind": "FUNCTION",
+"ret": "NUMBER",
+"params": [
+{
+"n": "p_quiz_id",
+"mode": "IN",
+"def": false,
+"t": "p_quiz_id IN NUMBER"
+}
+],
+"acc": false
+}
+],
+"save_answer": [
+{
+"kind": "PROCEDURE",
+"ret": null,
+"params": [
+{
+"n": "p_attempt_id",
+"mode": "IN",
+"def": false,
+"t": "p_attempt_id IN NUMBER"
+},
+{
+"n": "p_question_id",
+"mode": "IN",
+"def": false,
+"t": "p_question_id IN NUMBER"
+},
+{
+"n": "p_answer_json",
+"mode": "IN",
+"def": false,
+"t": "p_answer_json IN VARCHAR2"
+}
+],
+"acc": false
+}
+],
+"submit_attempt": [
+{
+"kind": "PROCEDURE",
+"ret": null,
+"params": [
+{
+"n": "p_attempt_id",
+"mode": "IN",
+"def": false,
+"t": "p_attempt_id IN NUMBER"
+},
+{
+"n": "p_status",
+"mode": "OUT",
+"def": false,
+"t": "p_status OUT VARCHAR2"
+},
+{
+"n": "p_score_pct",
+"mode": "OUT",
+"def": false,
+"t": "p_score_pct OUT NUMBER"
+},
+{
+"n": "p_passed",
+"mode": "OUT",
+"def": false,
+"t": "p_passed OUT VARCHAR2"
+}
+],
+"acc": false
+}
+],
+"grade_response": [
+{
+"kind": "PROCEDURE",
+"ret": null,
+"params": [
+{
+"n": "p_attempt_id",
+"mode": "IN",
+"def": false,
+"t": "p_attempt_id IN NUMBER"
+},
+{
+"n": "p_question_id",
+"mode": "IN",
+"def": false,
+"t": "p_question_id IN NUMBER"
+},
+{
+"n": "p_points",
+"mode": "IN",
+"def": false,
+"t": "p_points IN NUMBER"
+},
+{
+"n": "p_feedback",
+"mode": "IN",
+"def": true,
+"t": "p_feedback IN VARCHAR2 DEFAULT NULL"
+}
+],
+"acc": false
+}
+]
+},
+"lms_learning_path_pkg": {
+"create_path": [
+{
+"kind": "FUNCTION",
+"ret": "NUMBER",
+"params": [
+{
+"n": "p_path_code",
+"mode": "IN",
+"def": false,
+"t": "p_path_code IN VARCHAR2"
+},
+{
+"n": "p_title_en",
+"mode": "IN",
+"def": false,
+"t": "p_title_en IN VARCHAR2"
+},
+{
+"n": "p_title_ar",
+"mode": "IN",
+"def": true,
+"t": "p_title_ar IN VARCHAR2 DEFAULT NULL"
+},
+{
+"n": "p_certificate_eligible",
+"mode": "IN",
+"def": true,
+"t": "p_certificate_eligible IN VARCHAR2 DEFAULT 'N'"
+},
+{
+"n": "p_certificate_template_id",
+"mode": "IN",
+"def": true,
+"t": "p_certificate_template_id IN NUMBER DEFAULT NULL"
+}
+],
+"acc": false
+}
+],
+"add_course": [
+{
+"kind": "PROCEDURE",
+"ret": null,
+"params": [
+{
+"n": "p_path_id",
+"mode": "IN",
+"def": false,
+"t": "p_path_id IN NUMBER"
+},
+{
+"n": "p_course_id",
+"mode": "IN",
+"def": false,
+"t": "p_course_id IN NUMBER"
+},
+{
+"n": "p_sequence_no",
+"mode": "IN",
+"def": false,
+"t": "p_sequence_no IN NUMBER"
+},
+{
+"n": "p_required_flag",
+"mode": "IN",
+"def": true,
+"t": "p_required_flag IN VARCHAR2 DEFAULT 'Y'"
+}
+],
+"acc": false
+}
+],
+"publish_path": [
+{
+"kind": "PROCEDURE",
+"ret": null,
+"params": [
+{
+"n": "p_path_id",
+"mode": "IN",
+"def": false,
+"t": "p_path_id IN NUMBER"
+}
+],
+"acc": false
+}
+],
+"enroll_path": [
+{
+"kind": "FUNCTION",
+"ret": "NUMBER",
+"params": [
+{
+"n": "p_path_id",
+"mode": "IN",
+"def": false,
+"t": "p_path_id IN NUMBER"
+}
+],
+"acc": false
+}
+],
+"start_next_course": [
+{
+"kind": "PROCEDURE",
+"ret": null,
+"params": [
+{
+"n": "p_path_enrollment_id",
+"mode": "IN",
+"def": false,
+"t": "p_path_enrollment_id IN NUMBER"
+},
+{
+"n": "p_course_id",
+"mode": "OUT",
+"def": false,
+"t": "p_course_id OUT NUMBER"
+},
+{
+"n": "p_enrollment_id",
+"mode": "OUT",
+"def": false,
+"t": "p_enrollment_id OUT NUMBER"
+},
+{
+"n": "p_status",
+"mode": "OUT",
+"def": false,
+"t": "p_status OUT VARCHAR2"
+}
+],
+"acc": false
+}
+],
+"on_course_completed": [
+{
+"kind": "PROCEDURE",
+"ret": null,
+"params": [
+{
+"n": "p_user_id",
+"mode": "IN",
+"def": false,
+"t": "p_user_id IN NUMBER"
+},
+{
+"n": "p_course_id",
+"mode": "IN",
+"def": false,
+"t": "p_course_id IN NUMBER"
+}
+],
+"acc": true
+}
+]
+},
+"lms_session_pkg": {
+"create_session": [
+{
+"kind": "FUNCTION",
+"ret": "NUMBER",
+"params": [
+{
+"n": "p_course_id",
+"mode": "IN",
+"def": false,
+"t": "p_course_id IN NUMBER"
+},
+{
+"n": "p_venue_id",
+"mode": "IN",
+"def": false,
+"t": "p_venue_id IN NUMBER"
+},
+{
+"n": "p_instructor_id",
+"mode": "IN",
+"def": false,
+"t": "p_instructor_id IN NUMBER"
+},
+{
+"n": "p_start_ts",
+"mode": "IN",
+"def": false,
+"t": "p_start_ts IN TIMESTAMP WITH TIME ZONE"
+},
+{
+"n": "p_end_ts",
+"mode": "IN",
+"def": false,
+"t": "p_end_ts IN TIMESTAMP WITH TIME ZONE"
+},
+{
+"n": "p_seats",
+"mode": "IN",
+"def": false,
+"t": "p_seats IN NUMBER"
+},
+{
+"n": "p_meeting_url",
+"mode": "IN",
+"def": true,
+"t": "p_meeting_url IN VARCHAR2 DEFAULT NULL"
+},
+{
+"n": "p_min_attendance_pct",
+"mode": "IN",
+"def": true,
+"t": "p_min_attendance_pct IN NUMBER DEFAULT 80"
+}
+],
+"acc": false
+}
+],
+"publish_session": [
+{
+"kind": "PROCEDURE",
+"ret": null,
+"params": [
+{
+"n": "p_session_id",
+"mode": "IN",
+"def": false,
+"t": "p_session_id IN NUMBER"
+}
+],
+"acc": false
+}
+],
+"save_venue": [
+{
+"kind": "FUNCTION",
+"ret": "NUMBER",
+"params": [
+{
+"n": "p_venue_id",
+"mode": "IN",
+"def": false,
+"t": "p_venue_id IN NUMBER"
+},
+{
+"n": "p_name_en",
+"mode": "IN",
+"def": false,
+"t": "p_name_en IN VARCHAR2"
+},
+{
+"n": "p_name_ar",
+"mode": "IN",
+"def": false,
+"t": "p_name_ar IN VARCHAR2"
+},
+{
+"n": "p_address",
+"mode": "IN",
+"def": false,
+"t": "p_address IN VARCHAR2"
+},
+{
+"n": "p_capacity",
+"mode": "IN",
+"def": false,
+"t": "p_capacity IN NUMBER"
+},
+{
+"n": "p_active_flag",
+"mode": "IN",
+"def": false,
+"t": "p_active_flag IN VARCHAR2"
+}
+],
+"acc": false
+}
+],
+"remove_venue": [
+{
+"kind": "PROCEDURE",
+"ret": null,
+"params": [
+{
+"n": "p_venue_id",
+"mode": "IN",
+"def": false,
+"t": "p_venue_id IN NUMBER"
+}
+],
+"acc": false
+}
+],
+"register": [
+{
+"kind": "PROCEDURE",
+"ret": null,
+"params": [
+{
+"n": "p_session_id",
+"mode": "IN",
+"def": false,
+"t": "p_session_id IN NUMBER"
+},
+{
+"n": "p_status",
+"mode": "OUT",
+"def": false,
+"t": "p_status OUT VARCHAR2"
+}
+],
+"acc": false
+}
+],
+"cancel_registration": [
+{
+"kind": "PROCEDURE",
+"ret": null,
+"params": [
+{
+"n": "p_session_enrollment_id",
+"mode": "IN",
+"def": false,
+"t": "p_session_enrollment_id IN NUMBER"
+}
+],
+"acc": false
+}
+],
+"cancel_session": [
+{
+"kind": "PROCEDURE",
+"ret": null,
+"params": [
+{
+"n": "p_session_id",
+"mode": "IN",
+"def": false,
+"t": "p_session_id IN NUMBER"
+},
+{
+"n": "p_reason",
+"mode": "IN",
+"def": true,
+"t": "p_reason IN VARCHAR2 DEFAULT NULL"
+}
+],
+"acc": false
+}
+],
+"reschedule": [
+{
+"kind": "PROCEDURE",
+"ret": null,
+"params": [
+{
+"n": "p_session_id",
+"mode": "IN",
+"def": false,
+"t": "p_session_id IN NUMBER"
+},
+{
+"n": "p_start_ts",
+"mode": "IN",
+"def": false,
+"t": "p_start_ts IN TIMESTAMP WITH TIME ZONE"
+},
+{
+"n": "p_end_ts",
+"mode": "IN",
+"def": false,
+"t": "p_end_ts IN TIMESTAMP WITH TIME ZONE"
+}
+],
+"acc": false
+}
+],
+"record_attendance": [
+{
+"kind": "PROCEDURE",
+"ret": null,
+"params": [
+{
+"n": "p_session_enrollment_id",
+"mode": "IN",
+"def": false,
+"t": "p_session_enrollment_id IN NUMBER"
+},
+{
+"n": "p_day",
+"mode": "IN",
+"def": false,
+"t": "p_day IN DATE"
+},
+{
+"n": "p_status",
+"mode": "IN",
+"def": false,
+"t": "p_status IN VARCHAR2"
+}
+],
+"acc": false
+}
+],
+"update_session": [
+{
+"kind": "PROCEDURE",
+"ret": null,
+"params": [
+{
+"n": "p_session_id",
+"mode": "IN",
+"def": false,
+"t": "p_session_id IN NUMBER"
+},
+{
+"n": "p_venue_id",
+"mode": "IN",
+"def": false,
+"t": "p_venue_id IN NUMBER"
+},
+{
+"n": "p_instructor_id",
+"mode": "IN",
+"def": false,
+"t": "p_instructor_id IN NUMBER"
+},
+{
+"n": "p_seats",
+"mode": "IN",
+"def": false,
+"t": "p_seats IN NUMBER"
+},
+{
+"n": "p_meeting_url",
+"mode": "IN",
+"def": false,
+"t": "p_meeting_url IN VARCHAR2"
+},
+{
+"n": "p_min_attendance_pct",
+"mode": "IN",
+"def": false,
+"t": "p_min_attendance_pct IN NUMBER"
+}
+],
+"acc": false
+}
+],
+"complete_session": [
+{
+"kind": "PROCEDURE",
+"ret": null,
+"params": [
+{
+"n": "p_session_id",
+"mode": "IN",
+"def": false,
+"t": "p_session_id IN NUMBER"
+}
+],
+"acc": false
+}
+],
+"close_finished_sessions": [
+{
+"kind": "FUNCTION",
+"ret": "NUMBER",
+"params": [],
+"acc": false
+}
+],
+"send_reminders": [
+{
+"kind": "FUNCTION",
+"ret": "NUMBER",
+"params": [],
+"acc": false
+}
+]
+},
+"lms_certification_pkg": {
+"issue_for_enrollment": [
+{
+"kind": "PROCEDURE",
+"ret": null,
+"params": [
+{
+"n": "p_enrollment_id",
+"mode": "IN",
+"def": false,
+"t": "p_enrollment_id IN NUMBER"
+}
+],
+"acc": true
+}
+],
+"issue_for_path": [
+{
+"kind": "PROCEDURE",
+"ret": null,
+"params": [
+{
+"n": "p_path_enrollment_id",
+"mode": "IN",
+"def": false,
+"t": "p_path_enrollment_id IN NUMBER"
+}
+],
+"acc": true
+}
+],
+"authorize_download": [
+{
+"kind": "PROCEDURE",
+"ret": null,
+"params": [
+{
+"n": "p_certificate_id",
+"mode": "IN",
+"def": false,
+"t": "p_certificate_id IN NUMBER"
+}
+],
+"acc": false
+}
+],
+"verify": [
+{
+"kind": "FUNCTION",
+"ret": "SYS_REFCURSOR",
+"params": [
+{
+"n": "p_code",
+"mode": "IN",
+"def": false,
+"t": "p_code IN VARCHAR2"
+},
+{
+"n": "p_client_key",
+"mode": "IN",
+"def": false,
+"t": "p_client_key IN VARCHAR2"
+}
+],
+"acc": false
+}
+],
+"lookup_certificate": [
+{
+"kind": "FUNCTION",
+"ret": "SYS_REFCURSOR",
+"params": [
+{
+"n": "p_code",
+"mode": "IN",
+"def": false,
+"t": "p_code IN VARCHAR2"
+}
+],
+"acc": true
+}
+],
+"revoke": [
+{
+"kind": "PROCEDURE",
+"ret": null,
+"params": [
+{
+"n": "p_certificate_id",
+"mode": "IN",
+"def": false,
+"t": "p_certificate_id IN NUMBER"
+},
+{
+"n": "p_reason",
+"mode": "IN",
+"def": false,
+"t": "p_reason IN VARCHAR2"
+}
+],
+"acc": false
+}
+],
+"expire_due": [
+{
+"kind": "PROCEDURE",
+"ret": null,
+"params": [],
+"acc": false
+}
+],
+"renewal_sweep": [
+{
+"kind": "PROCEDURE",
+"ret": null,
+"params": [],
+"acc": false
+}
+]
+},
+"lms_calendar_pkg": {
+"build_ics": [
+{
+"kind": "FUNCTION",
+"ret": "CLOB",
+"params": [
+{
+"n": "p_session_id",
+"mode": "IN",
+"def": false,
+"t": "p_session_id IN NUMBER"
+},
+{
+"n": "p_user_id",
+"mode": "IN",
+"def": false,
+"t": "p_user_id IN NUMBER"
+},
+{
+"n": "p_method",
+"mode": "IN",
+"def": false,
+"t": "p_method IN VARCHAR2"
+}
+],
+"acc": true
+}
+],
+"my_session_ics": [
+{
+"kind": "FUNCTION",
+"ret": "CLOB",
+"params": [
+{
+"n": "p_session_id",
+"mode": "IN",
+"def": false,
+"t": "p_session_id IN NUMBER"
+}
+],
+"acc": false
+}
+],
+"stream_my_ics": [
+{
+"kind": "PROCEDURE",
+"ret": null,
+"params": [
+{
+"n": "p_session_id",
+"mode": "IN",
+"def": false,
+"t": "p_session_id IN NUMBER"
+}
+],
+"acc": false
+}
+]
+},
+"lms_feedback_pkg": {
+"submit_review": [
+{
+"kind": "PROCEDURE",
+"ret": null,
+"params": [
+{
+"n": "p_enrollment_id",
+"mode": "IN",
+"def": false,
+"t": "p_enrollment_id IN NUMBER"
+},
+{
+"n": "p_course_rating",
+"mode": "IN",
+"def": false,
+"t": "p_course_rating IN NUMBER"
+},
+{
+"n": "p_instructor_rating",
+"mode": "IN",
+"def": true,
+"t": "p_instructor_rating IN NUMBER DEFAULT NULL"
+},
+{
+"n": "p_review_text",
+"mode": "IN",
+"def": true,
+"t": "p_review_text IN VARCHAR2 DEFAULT NULL"
+}
+],
+"acc": false
+}
+],
+"submit_answer": [
+{
+"kind": "PROCEDURE",
+"ret": null,
+"params": [
+{
+"n": "p_enrollment_id",
+"mode": "IN",
+"def": false,
+"t": "p_enrollment_id IN NUMBER"
+},
+{
+"n": "p_question_id",
+"mode": "IN",
+"def": false,
+"t": "p_question_id IN NUMBER"
+},
+{
+"n": "p_rating",
+"mode": "IN",
+"def": true,
+"t": "p_rating IN NUMBER DEFAULT NULL"
+},
+{
+"n": "p_comment",
+"mode": "IN",
+"def": true,
+"t": "p_comment IN VARCHAR2 DEFAULT NULL"
+}
+],
+"acc": false
+}
+],
+"set_review_visibility": [
+{
+"kind": "PROCEDURE",
+"ret": null,
+"params": [
+{
+"n": "p_review_id",
+"mode": "IN",
+"def": false,
+"t": "p_review_id IN NUMBER"
+},
+{
+"n": "p_visible",
+"mode": "IN",
+"def": false,
+"t": "p_visible IN BOOLEAN"
+}
+],
+"acc": false
+}
+],
+"send_reminders": [
+{
+"kind": "FUNCTION",
+"ret": "NUMBER",
+"params": [],
+"acc": false
+}
+],
+"update_review": [
+{
+"kind": "PROCEDURE",
+"ret": null,
+"params": [
+{
+"n": "p_review_id",
+"mode": "IN",
+"def": false,
+"t": "p_review_id IN NUMBER"
+},
+{
+"n": "p_course_rating",
+"mode": "IN",
+"def": false,
+"t": "p_course_rating IN NUMBER"
+},
+{
+"n": "p_instructor_rating",
+"mode": "IN",
+"def": true,
+"t": "p_instructor_rating IN NUMBER DEFAULT NULL"
+},
+{
+"n": "p_review_text",
+"mode": "IN",
+"def": true,
+"t": "p_review_text IN VARCHAR2 DEFAULT NULL"
+}
+],
+"acc": false
+}
+],
+"save_form": [
+{
+"kind": "FUNCTION",
+"ret": "NUMBER",
+"params": [
+{
+"n": "p_form_id",
+"mode": "IN",
+"def": false,
+"t": "p_form_id IN NUMBER"
+},
+{
+"n": "p_name_en",
+"mode": "IN",
+"def": false,
+"t": "p_name_en IN VARCHAR2"
+},
+{
+"n": "p_name_ar",
+"mode": "IN",
+"def": false,
+"t": "p_name_ar IN VARCHAR2"
+},
+{
+"n": "p_active_flag",
+"mode": "IN",
+"def": false,
+"t": "p_active_flag IN VARCHAR2"
+}
+],
+"acc": false
+}
+],
+"clone_form": [
+{
+"kind": "FUNCTION",
+"ret": "NUMBER",
+"params": [
+{
+"n": "p_form_id",
+"mode": "IN",
+"def": false,
+"t": "p_form_id IN NUMBER"
+}
+],
+"acc": false
+}
+],
+"save_form_question": [
+{
+"kind": "FUNCTION",
+"ret": "NUMBER",
+"params": [
+{
+"n": "p_question_id",
+"mode": "IN",
+"def": false,
+"t": "p_question_id IN NUMBER"
+},
+{
+"n": "p_form_id",
+"mode": "IN",
+"def": false,
+"t": "p_form_id IN NUMBER"
+},
+{
+"n": "p_text_en",
+"mode": "IN",
+"def": false,
+"t": "p_text_en IN VARCHAR2"
+},
+{
+"n": "p_text_ar",
+"mode": "IN",
+"def": false,
+"t": "p_text_ar IN VARCHAR2"
+},
+{
+"n": "p_answer_type",
+"mode": "IN",
+"def": false,
+"t": "p_answer_type IN VARCHAR2"
+},
+{
+"n": "p_sort_order",
+"mode": "IN",
+"def": false,
+"t": "p_sort_order IN NUMBER"
+}
+],
+"acc": false
+}
+],
+"remove_form_question": [
+{
+"kind": "PROCEDURE",
+"ret": null,
+"params": [
+{
+"n": "p_question_id",
+"mode": "IN",
+"def": false,
+"t": "p_question_id IN NUMBER"
+}
+],
+"acc": false
+}
+],
+"assign_form": [
+{
+"kind": "PROCEDURE",
+"ret": null,
+"params": [
+{
+"n": "p_course_id",
+"mode": "IN",
+"def": false,
+"t": "p_course_id IN NUMBER"
+},
+{
+"n": "p_form_id",
+"mode": "IN",
+"def": false,
+"t": "p_form_id IN NUMBER"
+}
+],
+"acc": false
+}
+]
+},
+"lms_skill_pkg": {
+"assess_skill": [
+{
+"kind": "PROCEDURE",
+"ret": null,
+"params": [
+{
+"n": "p_user_id",
+"mode": "IN",
+"def": false,
+"t": "p_user_id IN NUMBER"
+},
+{
+"n": "p_skill_id",
+"mode": "IN",
+"def": false,
+"t": "p_skill_id IN NUMBER"
+},
+{
+"n": "p_level",
+"mode": "IN",
+"def": false,
+"t": "p_level IN NUMBER"
+}
+],
+"acc": false
+}
+],
+"recommended_courses": [
+{
+"kind": "FUNCTION",
+"ret": "SYS_REFCURSOR",
+"params": [
+{
+"n": "p_user_id",
+"mode": "IN",
+"def": true,
+"t": "p_user_id IN NUMBER DEFAULT NULL"
+}
+],
+"acc": false
+}
+],
+"save_skill": [
+{
+"kind": "FUNCTION",
+"ret": "NUMBER",
+"params": [
+{
+"n": "p_skill_id",
+"mode": "IN",
+"def": false,
+"t": "p_skill_id IN NUMBER"
+},
+{
+"n": "p_skill_code",
+"mode": "IN",
+"def": false,
+"t": "p_skill_code IN VARCHAR2"
+},
+{
+"n": "p_name_en",
+"mode": "IN",
+"def": false,
+"t": "p_name_en IN VARCHAR2"
+},
+{
+"n": "p_name_ar",
+"mode": "IN",
+"def": false,
+"t": "p_name_ar IN VARCHAR2"
+},
+{
+"n": "p_skill_group",
+"mode": "IN",
+"def": false,
+"t": "p_skill_group IN VARCHAR2"
+},
+{
+"n": "p_active_flag",
+"mode": "IN",
+"def": false,
+"t": "p_active_flag IN VARCHAR2"
+}
+],
+"acc": false
+}
+],
+"remove_skill": [
+{
+"kind": "PROCEDURE",
+"ret": null,
+"params": [
+{
+"n": "p_skill_id",
+"mode": "IN",
+"def": false,
+"t": "p_skill_id IN NUMBER"
+}
+],
+"acc": false
+}
+],
+"set_position_skill": [
+{
+"kind": "PROCEDURE",
+"ret": null,
+"params": [
+{
+"n": "p_position_id",
+"mode": "IN",
+"def": false,
+"t": "p_position_id IN NUMBER"
+},
+{
+"n": "p_skill_id",
+"mode": "IN",
+"def": false,
+"t": "p_skill_id IN NUMBER"
+},
+{
+"n": "p_required_level",
+"mode": "IN",
+"def": false,
+"t": "p_required_level IN NUMBER"
+}
+],
+"acc": false
+}
+],
+"set_course_skill": [
+{
+"kind": "PROCEDURE",
+"ret": null,
+"params": [
+{
+"n": "p_course_id",
+"mode": "IN",
+"def": false,
+"t": "p_course_id IN NUMBER"
+},
+{
+"n": "p_skill_id",
+"mode": "IN",
+"def": false,
+"t": "p_skill_id IN NUMBER"
+},
+{
+"n": "p_level_gained",
+"mode": "IN",
+"def": false,
+"t": "p_level_gained IN NUMBER"
+}
+],
+"acc": false
+}
+],
+"copy_position_skills": [
+{
+"kind": "FUNCTION",
+"ret": "NUMBER",
+"params": [
+{
+"n": "p_from_position",
+"mode": "IN",
+"def": false,
+"t": "p_from_position IN NUMBER"
+},
+{
+"n": "p_to_position",
+"mode": "IN",
+"def": false,
+"t": "p_to_position IN NUMBER"
+}
+],
+"acc": false
+}
+]
+},
+"lms_reporting_pkg": {
+"refresh_summaries": [
+{
+"kind": "PROCEDURE",
+"ret": null,
+"params": [],
+"acc": false
+}
+],
+"send_reminders": [
+{
+"kind": "PROCEDURE",
+"ret": null,
+"params": [],
+"acc": false
+}
+],
+"purge_logs": [
+{
+"kind": "PROCEDURE",
+"ret": null,
+"params": [],
+"acc": false
+}
+],
+"org_kpis": [
+{
+"kind": "FUNCTION",
+"ret": "SYS_REFCURSOR",
+"params": [],
+"acc": false
+}
+]
+},
+"lms_secret_pkg": {
+"content_signing_key": [
+{
+"kind": "FUNCTION",
+"ret": "RAW",
+"params": [],
+"acc": false
+}
+]
+},
+"lms_apex_pkg": {
+"is_active_user": [
+{
+"kind": "FUNCTION",
+"ret": "BOOLEAN",
+"params": [],
+"acc": false
+}
+],
+"has_perm": [
+{
+"kind": "FUNCTION",
+"ret": "BOOLEAN",
+"params": [
+{
+"n": "p_code",
+"mode": "IN",
+"def": false,
+"t": "p_code IN VARCHAR2"
+}
+],
+"acc": false
+}
+],
+"has_scope": [
+{
+"kind": "FUNCTION",
+"ret": "BOOLEAN",
+"params": [
+{
+"n": "p_code",
+"mode": "IN",
+"def": false,
+"t": "p_code IN VARCHAR2"
+},
+{
+"n": "p_scope",
+"mode": "IN",
+"def": false,
+"t": "p_scope IN VARCHAR2"
+}
+],
+"acc": false
+}
+],
+"is_manager": [
+{
+"kind": "FUNCTION",
+"ret": "BOOLEAN",
+"params": [],
+"acc": false
+}
+],
+"is_enrolled": [
+{
+"kind": "FUNCTION",
+"ret": "BOOLEAN",
+"params": [
+{
+"n": "p_enrollment_id",
+"mode": "IN",
+"def": false,
+"t": "p_enrollment_id IN VARCHAR2"
+}
+],
+"acc": false
+}
+],
+"can_manage_course": [
+{
+"kind": "FUNCTION",
+"ret": "BOOLEAN",
+"params": [
+{
+"n": "p_course_id",
+"mode": "IN",
+"def": false,
+"t": "p_course_id IN VARCHAR2"
+},
+{
+"n": "p_permission",
+"mode": "IN",
+"def": true,
+"t": "p_permission IN VARCHAR2 DEFAULT 'COURSE_AUTHOR'"
+}
+],
+"acc": false
+}
+],
+"owns_certificate": [
+{
+"kind": "FUNCTION",
+"ret": "BOOLEAN",
+"params": [
+{
+"n": "p_certificate_id",
+"mode": "IN",
+"def": false,
+"t": "p_certificate_id IN VARCHAR2"
+}
+],
+"acc": false
+}
+],
+"post_auth": [
+{
+"kind": "PROCEDURE",
+"ret": null,
+"params": [],
+"acc": false
+}
+],
+"error_handler": [
+{
+"kind": "FUNCTION",
+"ret": "apex_error.t_error_handling_result",
+"params": [
+{
+"n": "p_error",
+"mode": "IN",
+"def": false,
+"t": "p_error IN apex_error.t_error"
+}
+],
+"acc": false
+}
+],
+"ajax_progress": [
+{
+"kind": "PROCEDURE",
+"ret": null,
+"params": [],
+"acc": false
+}
+],
+"ajax_save_answer": [
+{
+"kind": "PROCEDURE",
+"ret": null,
+"params": [],
+"acc": false
+}
+],
+"ajax_unread": [
+{
+"kind": "PROCEDURE",
+"ret": null,
+"params": [],
+"acc": false
+}
+],
+"authorize_lesson_access": [
+{
+"kind": "PROCEDURE",
+"ret": null,
+"params": [
+{
+"n": "p_enrollment_id",
+"mode": "IN",
+"def": false,
+"t": "p_enrollment_id IN NUMBER"
+},
+{
+"n": "p_lesson_id",
+"mode": "IN",
+"def": false,
+"t": "p_lesson_id IN NUMBER"
+}
+],
+"acc": false
+}
+],
+"content_url": [
+{
+"kind": "FUNCTION",
+"ret": "VARCHAR2",
+"params": [
+{
+"n": "p_enrollment_id",
+"mode": "IN",
+"def": false,
+"t": "p_enrollment_id IN NUMBER"
+},
+{
+"n": "p_lesson_id",
+"mode": "IN",
+"def": false,
+"t": "p_lesson_id IN NUMBER"
+}
+],
+"acc": false
+}
+],
+"lesson_html": [
+{
+"kind": "FUNCTION",
+"ret": "CLOB",
+"params": [
+{
+"n": "p_enrollment_id",
+"mode": "IN",
+"def": false,
+"t": "p_enrollment_id IN NUMBER"
+},
+{
+"n": "p_lesson_id",
+"mode": "IN",
+"def": false,
+"t": "p_lesson_id IN NUMBER"
+}
+],
+"acc": false
+}
+],
+"stream_lesson_file": [
+{
+"kind": "PROCEDURE",
+"ret": null,
+"params": [
+{
+"n": "p_enrollment_id",
+"mode": "IN",
+"def": false,
+"t": "p_enrollment_id IN NUMBER"
+},
+{
+"n": "p_lesson_id",
+"mode": "IN",
+"def": false,
+"t": "p_lesson_id IN NUMBER"
+}
+],
+"acc": false
+}
+],
+"search_allowed": [
+{
+"kind": "FUNCTION",
+"ret": "VARCHAR2",
+"params": [],
+"acc": false
+}
+],
+"status_label": [
+{
+"kind": "FUNCTION",
+"ret": "VARCHAR2",
+"params": [
+{
+"n": "p_status",
+"mode": "IN",
+"def": false,
+"t": "p_status IN VARCHAR2"
+}
+],
+"acc": false
+}
+]
+},
+"lms_admin_pkg": {
+"set_setting": [
+{
+"kind": "PROCEDURE",
+"ret": null,
+"params": [
+{
+"n": "p_key",
+"mode": "IN",
+"def": false,
+"t": "p_key IN VARCHAR2"
+},
+{
+"n": "p_value",
+"mode": "IN",
+"def": false,
+"t": "p_value IN VARCHAR2"
+}
+],
+"acc": false
+}
+],
+"set_rate_limit_policy": [
+{
+"kind": "PROCEDURE",
+"ret": null,
+"params": [
+{
+"n": "p_policy_id",
+"mode": "IN",
+"def": false,
+"t": "p_policy_id IN NUMBER"
+},
+{
+"n": "p_limit_count",
+"mode": "IN",
+"def": false,
+"t": "p_limit_count IN NUMBER"
+},
+{
+"n": "p_window_seconds",
+"mode": "IN",
+"def": false,
+"t": "p_window_seconds IN NUMBER"
+},
+{
+"n": "p_burst_limit",
+"mode": "IN",
+"def": false,
+"t": "p_burst_limit IN NUMBER"
+},
+{
+"n": "p_fail_mode",
+"mode": "IN",
+"def": false,
+"t": "p_fail_mode IN VARCHAR2"
+},
+{
+"n": "p_enabled",
+"mode": "IN",
+"def": false,
+"t": "p_enabled IN VARCHAR2"
+}
+],
+"acc": false
+}
+],
+"set_role_permission": [
+{
+"kind": "PROCEDURE",
+"ret": null,
+"params": [
+{
+"n": "p_role_code",
+"mode": "IN",
+"def": false,
+"t": "p_role_code IN VARCHAR2"
+},
+{
+"n": "p_permission_code",
+"mode": "IN",
+"def": false,
+"t": "p_permission_code IN VARCHAR2"
+},
+{
+"n": "p_scope",
+"mode": "IN",
+"def": false,
+"t": "p_scope IN VARCHAR2"
+}
+],
+"acc": false
+}
+],
+"save_template": [
+{
+"kind": "PROCEDURE",
+"ret": null,
+"params": [
+{
+"n": "p_code",
+"mode": "IN",
+"def": false,
+"t": "p_code IN VARCHAR2"
+},
+{
+"n": "p_lang",
+"mode": "IN",
+"def": false,
+"t": "p_lang IN VARCHAR2"
+},
+{
+"n": "p_subject",
+"mode": "IN",
+"def": false,
+"t": "p_subject IN VARCHAR2"
+},
+{
+"n": "p_body",
+"mode": "IN",
+"def": false,
+"t": "p_body IN VARCHAR2"
+},
+{
+"n": "p_active",
+"mode": "IN",
+"def": true,
+"t": "p_active IN VARCHAR2 DEFAULT 'Y'"
+}
+],
+"acc": false
+}
+],
+"save_category": [
+{
+"kind": "FUNCTION",
+"ret": "NUMBER",
+"params": [
+{
+"n": "p_category_id",
+"mode": "IN",
+"def": false,
+"t": "p_category_id IN NUMBER"
+},
+{
+"n": "p_parent_id",
+"mode": "IN",
+"def": false,
+"t": "p_parent_id IN NUMBER"
+},
+{
+"n": "p_name_en",
+"mode": "IN",
+"def": false,
+"t": "p_name_en IN VARCHAR2"
+},
+{
+"n": "p_name_ar",
+"mode": "IN",
+"def": false,
+"t": "p_name_ar IN VARCHAR2"
+},
+{
+"n": "p_sort_order",
+"mode": "IN",
+"def": false,
+"t": "p_sort_order IN NUMBER"
+},
+{
+"n": "p_active_flag",
+"mode": "IN",
+"def": false,
+"t": "p_active_flag IN VARCHAR2"
+}
+],
+"acc": false
+}
+],
+"save_certificate_template": [
+{
+"kind": "FUNCTION",
+"ret": "NUMBER",
+"params": [
+{
+"n": "p_template_id",
+"mode": "IN",
+"def": false,
+"t": "p_template_id IN NUMBER"
+},
+{
+"n": "p_code",
+"mode": "IN",
+"def": false,
+"t": "p_code IN VARCHAR2"
+},
+{
+"n": "p_name_en",
+"mode": "IN",
+"def": false,
+"t": "p_name_en IN VARCHAR2"
+},
+{
+"n": "p_name_ar",
+"mode": "IN",
+"def": false,
+"t": "p_name_ar IN VARCHAR2"
+},
+{
+"n": "p_validity_months",
+"mode": "IN",
+"def": false,
+"t": "p_validity_months IN NUMBER"
+},
+{
+"n": "p_body_text",
+"mode": "IN",
+"def": false,
+"t": "p_body_text IN VARCHAR2"
+},
+{
+"n": "p_active_flag",
+"mode": "IN",
+"def": false,
+"t": "p_active_flag IN VARCHAR2"
+}
+],
+"acc": false
+}
+]
+},
+"lms_ords_pkg": {
+"verify_certificate": [
+{
+"kind": "PROCEDURE",
+"ret": null,
+"params": [
+{
+"n": "p_code",
+"mode": "IN",
+"def": false,
+"t": "p_code IN VARCHAR2"
+},
+{
+"n": "p_client_key",
+"mode": "IN",
+"def": false,
+"t": "p_client_key IN VARCHAR2"
+},
+{
+"n": "p_status",
+"mode": "OUT",
+"def": false,
+"t": "p_status OUT NUMBER"
+},
+{
+"n": "p_retry_after",
+"mode": "OUT",
+"def": false,
+"t": "p_retry_after OUT NUMBER"
+}
+],
+"acc": false
+}
+],
+"catalog_search": [
+{
+"kind": "PROCEDURE",
+"ret": null,
+"params": [
+{
+"n": "p_q",
+"mode": "IN",
+"def": false,
+"t": "p_q IN VARCHAR2"
+},
+{
+"n": "p_category",
+"mode": "IN",
+"def": false,
+"t": "p_category IN VARCHAR2"
+},
+{
+"n": "p_limit",
+"mode": "IN",
+"def": false,
+"t": "p_limit IN VARCHAR2"
+},
+{
+"n": "p_offset",
+"mode": "IN",
+"def": false,
+"t": "p_offset IN VARCHAR2"
+},
+{
+"n": "p_client_key",
+"mode": "IN",
+"def": false,
+"t": "p_client_key IN VARCHAR2"
+},
+{
+"n": "p_status",
+"mode": "OUT",
+"def": false,
+"t": "p_status OUT NUMBER"
+},
+{
+"n": "p_retry_after",
+"mode": "OUT",
+"def": false,
+"t": "p_retry_after OUT NUMBER"
+}
+],
+"acc": false
+}
+],
+"catalog_course": [
+{
+"kind": "PROCEDURE",
+"ret": null,
+"params": [
+{
+"n": "p_course_id",
+"mode": "IN",
+"def": false,
+"t": "p_course_id IN VARCHAR2"
+},
+{
+"n": "p_client_key",
+"mode": "IN",
+"def": false,
+"t": "p_client_key IN VARCHAR2"
+},
+{
+"n": "p_status",
+"mode": "OUT",
+"def": false,
+"t": "p_status OUT NUMBER"
+},
+{
+"n": "p_retry_after",
+"mode": "OUT",
+"def": false,
+"t": "p_retry_after OUT NUMBER"
+}
+],
+"acc": false
+}
+],
+"hr_sync": [
+{
+"kind": "PROCEDURE",
+"ret": null,
+"params": [
+{
+"n": "p_body",
+"mode": "IN",
+"def": false,
+"t": "p_body IN CLOB"
+},
+{
+"n": "p_client_key",
+"mode": "IN",
+"def": false,
+"t": "p_client_key IN VARCHAR2"
+},
+{
+"n": "p_status",
+"mode": "OUT",
+"def": false,
+"t": "p_status OUT NUMBER"
+},
+{
+"n": "p_retry_after",
+"mode": "OUT",
+"def": false,
+"t": "p_retry_after OUT NUMBER"
+}
+],
+"acc": false
+}
+],
+"health": [
+{
+"kind": "PROCEDURE",
+"ret": null,
+"params": [
+{
+"n": "p_status",
+"mode": "OUT",
+"def": false,
+"t": "p_status OUT NUMBER"
+}
+],
+"acc": false
+}
+]
+}
+}

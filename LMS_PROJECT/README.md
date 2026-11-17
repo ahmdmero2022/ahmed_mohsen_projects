@@ -11,7 +11,8 @@ Design package and implementation blueprint. Document version 0.1 (draft for rev
 | APEX application export (`f*.sql`) | **Not produced.** Page specifications only; cannot be validated without an APEX 24.1 workspace |
 | Test results | **None.** Test cases are defined; all "Actual result" fields are blank |
 | Database scripts (56 tables, 92 views, 23 packages, seeds, jobs, validation, rollback) | **Written, not executed.** Static consistency checks run; see `02_DATABASE/README.md` |
-| APEX page specifications (5 apps, ~75 pages), shared components, CSS/JS | **Written as build specs**; no APEX export; JS syntax-checked only; see `03_APEX/README.md` |
+| APEX page specifications (5 apps, ~75 pages), shared components, CSS/JS | **Written as build specs**; JS syntax-checked only; see `03_APEX/README.md` |
+| APEX 24.1 import files for the 5 apps (91 pages) + generator | **Generated and statically checked** against the database scripts; **not yet imported**; see `03_APEX/APPLICATION_EXPORTS/README.md` |
 | ORDS modules, OpenAPI contract, smoke test | **Written, not executed**; see `05_INTEGRATIONS/README.md` |
 
 ## Index
