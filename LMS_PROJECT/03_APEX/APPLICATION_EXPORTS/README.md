@@ -44,6 +44,8 @@ Checked by the generator before writing the files:
 
 Not checked: the import itself, the PL/SQL inside pages (it is compiled at run time), page layout and behaviour.
 
+See `local_install/README.txt` for a step-by-step install on your own PC (schema, database, APEX user, import).
+
 ## Before importing
 1. **Use a separate schema** for this design, for example `LMS`. Do not install it into `AUTH`: your existing
    application uses `LMS_*` tables and packages of a different design there, and the names would collide.
